@@ -6,6 +6,7 @@
 #include <glm/matrix.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <Magick++.h>
 
 using std::cout, std::endl;
 using glm::mat4, 
@@ -19,17 +20,24 @@ constexpr GLuint WIDTH = 800,
 	HEIGHT = 600;
 
 GLchar const * vertex_shader_source = R"(
-#version 100
+#version 320 es
 uniform mat4 local_to_screen;
-attribute vec3 position;
+in vec3 position;  // vertices
+in vec2 st;  // texture coordinates
+out vec2 tex_coord;
 void main() {
 	gl_Position = local_to_screen * vec4(position, 1.0);
+	tex_coord = st;
 })";
 
 GLchar const * fragment_shader_source = R"(
-#version 100
+#version 320 es
+precision mediump float;
+in vec2 tex_coord;
+out vec4 frag_color;
+uniform sampler2D s;
 void main() {
-	gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+	frag_color = vec4(texture(s, tex_coord), 1.0);
 })";
 
 GLfloat const xy_plane_verts[] = {
@@ -44,8 +52,17 @@ GLfloat const xy_plane_verts[] = {
 	0.f, 0.f, 0.f
 };
 
-GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source);
+GLfloat const xy_plane_texcoords[] = {
+	0, 0,  // triangle 1
+	1, 0,
+	1, 1,
+	1, 1,  // triangle 2
+	0, 1,
+	0, 0
+};
 
+GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source);
+GLuint create_texture(std::string const & fname);
 
 int main(int argc, char * argv[]) {
 	SDL_Init(SDL_INIT_VIDEO);
@@ -70,6 +87,20 @@ int main(int argc, char * argv[]) {
 	
 	glUseProgram(shader_program);
 
+	// generate texture
+	GLuint texture = create_texture("lena.jpg");
+	// glGenTextures(1, &texture);
+	// glBindTexture(GL_TEXTURE_2D, texture);
+
+	// // set the texture wrapping parameters
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // Wrap horizontally
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // Wrap vertically
+
+	// // set texture filtering parameters
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// camera
 	mat4 P = perspective(radians(60.f), WIDTH/(float)HEIGHT, 0.01f, 1000.f);
 	mat4 V = inverse(translate(mat4{1}, vec3{0,0,2}));  // we can also use lookAt there
 	mat4 M = scale(translate(mat4{1}, vec3{-1,-1,0}), vec3{2,2,1});  // T*S
@@ -155,4 +186,20 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 	glDeleteShader(vertex_shader);
 	glDeleteShader(fragment_shader);
 	return shader_program;
+}
+
+GLuint create_texture(std::string const & fname) {
+	Magick::Image im{fname};
+	im.flip();
+	Magick::Blob imblob;
+	im.write(&imblob, "RGBA");  // load image as rgba array
+
+	GLuint tbo;
+	glGenTextures(1, &tbo);
+	glBindTexture(GL_TEXTURE_2D, tbo);
+	// glPixelStorei() : adresa kazdeho riadku obrazka je zarovnana 4mi (RGBA foramt)
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
+
+	return tbo;
 }
