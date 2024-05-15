@@ -3,26 +3,13 @@
 # target all dependencies needs to be met.
 
 def build():
-	cpp20_env = Environment(CXXFLAGS=['-std=c++20'], CFLAGS=['-Wall'])
+	cpp20_env = Environment(
+		CXXFLAGS=['-std=c++20'], CFLAGS=['-Wall'])
 
 	# for OpenGL samples
 
 	# List of pkg-config based library dependencies as (library, version) pair or just package name as string (e.g. ('libzmq', '>= 4.3.0') pair or 'libzmq' string). Library package version can be found by running `pkg-config --modversion LIBRARY` command.
-	ogl_deps = [
-		('fmt', '>= 8.1.1'),
-		('glm', '>= 0.9.9.5'),
-		('sdl2', '>= 2.0.20'),
-		('glesv2', '>= 3.2')
-	]
-
-	ogl_env = cpp20_env.Clone()
-	ogl_env = configure(ogl_env, ogl_deps)
-
-	ogl_env.Program(['xy_plane.cpp'])
-	ogl_env.Program(['xy_plane_panzoom.cpp'])
-	ogl_env.Program(['xy_plane_grid.cpp'])
-
-	img_deps = [
+	deps = [
 		('fmt', '>= 8.1.1'),
 		('glm', '>= 0.9.9.5'),
 		('sdl2', '>= 2.0.20'),
@@ -30,10 +17,13 @@ def build():
 		('Magick++', '>= 6.9.11')
 	]
 
-	img_env = cpp20_env.Clone()
-	img_env = configure(img_env, img_deps)
-	img_env.Program('texture_storage.cpp')
+	env = cpp20_env.Clone()
+	env = configure(env, deps)
 
+	env.Program(['xy_plane.cpp'])
+	env.Program(['xy_plane_panzoom.cpp'])
+	env.Program(['xy_plane_grid.cpp'])
+	env.Program(['texture_storage.cpp'])
 
 def configure(env, dependency_list):
 	conf = env.Configure(
