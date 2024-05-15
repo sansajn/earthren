@@ -1,0 +1,8 @@
+*.o
+config.log
+.sconsign.dblite
+
+xy_plane
+xy_plane_grid
+xy_plane_panzoom
+texture_storage
