@@ -23,7 +23,7 @@ GLchar const * vertex_shader_source = R"(
 #version 320 es
 uniform mat4 local_to_screen;
 in vec3 position;  // vertices
-in vec2 st;  // texture coordinates
+in vec2 st;  // texture coordinates TODO: why not uv?
 out vec2 tex_coord;
 void main() {
 	gl_Position = local_to_screen * vec4(position, 1.0);
@@ -37,7 +37,7 @@ in vec2 tex_coord;
 out vec4 frag_color;
 uniform sampler2D s;
 void main() {
-	frag_color = vec4(texture(s, tex_coord), 1.0);
+    frag_color = texture(s, tex_coord);
 })";
 
 GLfloat const xy_plane_verts[] = {
@@ -62,6 +62,8 @@ GLfloat const xy_plane_texcoords[] = {
 };
 
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source);
+
+//! Creates OpenGL texture from image \c fname file and returns texture ID.
 GLuint create_texture(std::string const & fname);
 
 int main(int argc, char * argv[]) {
@@ -83,22 +85,14 @@ int main(int argc, char * argv[]) {
 	GLuint shader_program = get_shader_program(vertex_shader_source, fragment_shader_source);
 	
 	GLint position_loc = glGetAttribLocation(shader_program, "position");
+    GLint st_loc = glGetAttribLocation(shader_program, "st");
 	GLint local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
+    GLint s_loc = glGetUniformLocation(shader_program, "s");
 	
 	glUseProgram(shader_program);
 
 	// generate texture
 	GLuint texture = create_texture("lena.jpg");
-	// glGenTextures(1, &texture);
-	// glBindTexture(GL_TEXTURE_2D, texture);
-
-	// // set the texture wrapping parameters
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // Wrap horizontally
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // Wrap vertically
-
-	// // set texture filtering parameters
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	// camera
 	mat4 P = perspective(radians(60.f), WIDTH/(float)HEIGHT, 0.01f, 1000.f);
@@ -110,13 +104,26 @@ int main(int argc, char * argv[]) {
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
 
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    GLuint vbo[2];  // vertices, texcoords
+    glGenBuffers(2, vbo);
+
+    // for position attributes
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(xy_plane_verts), xy_plane_verts, GL_STATIC_DRAW);
 	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-	glEnableVertexAttribArray(position_loc);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glEnableVertexAttribArray(position_loc);
+
+    // for st attributes
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(xy_plane_texcoords), xy_plane_texcoords, GL_STATIC_DRAW);
+    glVertexAttribPointer(st_loc, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+    glEnableVertexAttribArray(st_loc);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbid current buffer
+
+    glUniform1i(s_loc, 0);  // set sampler s to use texture unit 0
+    glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+    glBindTexture(GL_TEXTURE_2D, texture);  // bind a texture to active texture unit (0)
 
 	while (true) {
 		SDL_Event event;
@@ -131,7 +138,7 @@ int main(int argc, char * argv[]) {
 		SDL_GL_SwapWindow(window);
 	}
 	
-	glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(2, vbo);
 	glDeleteProgram(shader_program);
 
 	SDL_GL_DeleteContext(context);
@@ -197,9 +204,9 @@ GLuint create_texture(std::string const & fname) {
 	GLuint tbo;
 	glGenTextures(1, &tbo);
 	glBindTexture(GL_TEXTURE_2D, tbo);
-	// glPixelStorei() : adresa kazdeho riadku obrazka je zarovnana 4mi (RGBA foramt)
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
+    glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
 
 	return tbo;
 }

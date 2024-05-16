@@ -24,6 +24,7 @@ def build():
 	env.Program(['xy_plane_panzoom.cpp'])
 	env.Program(['xy_plane_grid.cpp'])
 	env.Program(['texture_storage.cpp'])
+	env.Program(['xy_plane_texture.cpp'])
 
 def configure(env, dependency_list):
 	conf = env.Configure(
