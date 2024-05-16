@@ -2,6 +2,8 @@
 #include <chrono>
 #include <iostream>
 #include <cassert>
+#include <vector>
+#include <string>
 #include <fmt/core.h>
 #include <SDL.h>
 #include <GLES3/gl32.h>
@@ -10,6 +12,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <Magick++.h>
 
+
+using std::vector, std::string;
 using std::cout, std::endl;
 using fmt::print;
 using std::chrono::steady_clock, std::chrono::duration_cast, 
@@ -21,6 +25,8 @@ using glm::mat4,
 	glm::translate,
 	glm::radians;
 
+using namespace std::string_literals;
+
 constexpr GLuint WIDTH = 800,
 	HEIGHT = 600;
 
@@ -28,11 +34,11 @@ GLchar const * vertex_shader_source = R"(
 #version 320 es
 uniform mat4 local_to_screen;
 in vec3 position;
-in vec2 st;  // texture coordinates TODO: why not uv?
+in vec2 uv;  // texture coordinates
 out vec2 tex_coord;
 void main() {
 	gl_Position = local_to_screen * vec4(position, 1.0);
-    tex_coord = st;
+    tex_coord = uv;
 })";
 
 GLchar const * fragment_shader_source = R"(
@@ -43,7 +49,7 @@ out vec4 frag_color;
 uniform vec3 color;
 uniform sampler2D s;
 void main() {
-    frag_color = mix(texture(s, tex_coord), vec4(color, 1.0), 0.5);
+    frag_color = mix(texture(s, tex_coord), vec4(color, 1.0), 0.15);
 })";
 
 GLfloat const xy_plane_verts[] = {
@@ -74,6 +80,8 @@ GLuint create_texture(std::string const & fname);
 
 // TODO: can we benefit there with create_mesh function?
 
+vector<GLuint> read_tiles();
+
 int main(int argc, char * argv[]) {
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
@@ -93,7 +101,7 @@ int main(int argc, char * argv[]) {
 	GLuint const shader_program = get_shader_program(vertex_shader_source, fragment_shader_source);
 	
 	GLint const position_loc = glGetAttribLocation(shader_program, "position");
-    GLint const st_loc = glGetAttribLocation(shader_program, "st");
+    GLint const uv_loc = glGetAttribLocation(shader_program, "uv");
 	GLint const local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
 	GLint const color_loc = glGetUniformLocation(shader_program, "color");
     GLint const s_loc = glGetUniformLocation(shader_program, "s");
@@ -101,8 +109,6 @@ int main(int argc, char * argv[]) {
 	glUseProgram(shader_program);
 
     // generate texture
-    GLuint texture = create_texture("lena.jpg");
-
 	mat4 P = perspective(radians(60.f), WIDTH/(float)HEIGHT, 0.01f, 1000.f);
 	
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -120,12 +126,16 @@ int main(int argc, char * argv[]) {
     // for st attributes
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(xy_plane_texcoords), xy_plane_texcoords, GL_STATIC_DRAW);
-    glVertexAttribPointer(st_loc, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(st_loc);
+    glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+    glEnableVertexAttribArray(uv_loc);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbid current buffer
 
+    // grid dimensions
+    constexpr unsigned row_count = 5,
+        col_count = 5;
 
+    vector<GLuint> tiles = read_tiles();
 
 	float distance = 2.0f;
 	vec2 xy_offset = vec2{0, 0};
@@ -176,18 +186,14 @@ int main(int argc, char * argv[]) {
 		// render
 		glClear(GL_COLOR_BUFFER_BIT);  // clear buffer
 
-        // grid dimensions
-        constexpr unsigned row_count = 5,
-            col_count = 4;
-
 		// draw grid of xy planes
         for (unsigned row = 0; row < row_count; ++row) {
             for (unsigned col = 0; col < col_count; ++col) {
                 // bind texture to a sampler (this is not changing)
+                GLuint const & tile = tiles[col + row*col_count];
                 glUniform1i(s_loc, 0);  // set sampler s to use texture unit 0
                 glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-                glBindTexture(GL_TEXTURE_2D, texture);  // bind a texture to active texture unit (0)
-                // TODO: there we want to bind a proper texture
+                glBindTexture(GL_TEXTURE_2D, tile);  // bind a texture to active texture unit (0)
 
 				float const model_scale = 2.0f;
                 vec2 model_pos = (vec2{col, row} - vec2(col_count, row_count)/2.0f) * model_scale;
@@ -213,6 +219,24 @@ int main(int argc, char * argv[]) {
 	SDL_Quit();
 	
 	return 0;
+}
+
+vector<GLuint> read_tiles() {
+    // OSM tiles are are addresed from left-bottom corner (so we need to flip y coordinate)
+    constexpr unsigned from_x = 2210,
+        to_x = 2215,
+        from_y = 1386,
+        to_y = 1391;
+
+    vector<GLuint> tiles;
+    tiles.reserve(25);
+    for (unsigned y = to_y-1; y >= from_y; --y) {
+        for (unsigned x = from_x; x < to_x; ++x) {
+            string tile_name = fmt::format("{}_{}.png", x, y);
+            tiles.push_back(create_texture("data/tiles/"s + tile_name));
+        }
+    }
+    return tiles;
 }
 
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source) {
