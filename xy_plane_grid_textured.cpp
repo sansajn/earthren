@@ -125,10 +125,7 @@ int main(int argc, char * argv[]) {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbid current buffer
 
-    // bind texture to a sampler (this is not changing)
-    glUniform1i(s_loc, 0);  // set sampler s to use texture unit 0
-    glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-    glBindTexture(GL_TEXTURE_2D, texture);  // bind a texture to active texture unit (0)
+
 
 	float distance = 2.0f;
 	vec2 xy_offset = vec2{0, 0};
@@ -179,18 +176,26 @@ int main(int argc, char * argv[]) {
 		// render
 		glClear(GL_COLOR_BUFFER_BIT);  // clear buffer
 
-		constexpr unsigned grid_size = 51;  // note this should be odd number
+        // grid dimensions
+        constexpr unsigned row_count = 5,
+            col_count = 4;
 
 		// draw grid of xy planes
-		for (unsigned row = 0; row < grid_size; ++row) {
-			for (unsigned col = 0; col < grid_size; ++col) {
+        for (unsigned row = 0; row < row_count; ++row) {
+            for (unsigned col = 0; col < col_count; ++col) {
+                // bind texture to a sampler (this is not changing)
+                glUniform1i(s_loc, 0);  // set sampler s to use texture unit 0
+                glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+                glBindTexture(GL_TEXTURE_2D, texture);  // bind a texture to active texture unit (0)
+                // TODO: there we want to bind a proper texture
+
 				float const model_scale = 2.0f;
-				vec2 model_pos = (vec2{col, row} - (grid_size/2.0f)) * model_scale;
+                vec2 model_pos = (vec2{col, row} - vec2(col_count, row_count)/2.0f) * model_scale;
 				mat4 M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 				mat4 local_to_screen = P*V*M;
 				glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 				
-				vec3 color = (col + (row*grid_size)) % 2 ? vec3{1, 0, 0} : vec3{0, 0, 1};
+                vec3 color = (col + (row*col_count)) % 2 ? vec3{1, 0, 0} : vec3{0, 0, 1};
 				glUniform3f(color_loc, color.r, color.g, color.b);
 				
 				glDrawArrays(GL_TRIANGLES, 0, 6);

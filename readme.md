@@ -4,19 +4,24 @@ for more details see earth rendering notes ...
 # Samples
 
 ## `xy_plane_grid_textured`
+
 The latest sample is `xy_plane_grid_textured.cpp` which shows grid of xy_planes the same as previous `xy_plane_grid.cpp` sample but with a texture applied.
 
 The problem there is that pane is not smooth it has a kind of momentum. Affected samples are `xy_plane_grid.cpp`, `xy_plane_grid` and `xy_plane_panzoom` samples.
 
+Another issue is that it is hard to diagnose issues in a shader program, see issue 1.
+
 ToDo:
 - rewrite pan functionality
+- use VAOs (see `texture_torage` as an example)
+
 
 Then Next step is to implement a camera which would allow smooth pane and zoom.
 
 
 ## `xy_plane_grid`
 
-`xy_plane_grid.cpp`: shows grid of xy_planes with a zoom and pane features. There is not any camera implementation there.
+Shows grid of xy_planes with a zoom and pane features. There is not any camera implementation there.
 
 The problem there is that pane is not smooth it has a kind of momentum. Affected samples are `xy_plane_grid` and `xy_plane_panzoom` samples.
 
@@ -27,16 +32,28 @@ Next step is to implement a grid of xy_planes rendered with a image inside (inst
 
 Then Next step is to implement a camera which would allow smooth pane and zoom.
 
-`xy_plane_texture`: shows how to render xy plane fillet with an image
+
+## `xy_plane_texture`
+
+Shows how to render xy plane fillet with an image
 
 Problems: 
 	- we should use VAOs
 
-`texture_storage`: shows how to render a picture to screen
+## `texture_storage`
 
-`xy_plane_panzoom`: xy plane with zoom and pane capabilities
+Shows how to render a picture to screen.
 
-`xy_plane`: just a simple red xy plane rendered
+
+## `xy_plane_panzoom`
+
+xy plane with zoom and pane capabilities
+
+
+## `xy_plane`
+
+Just a simple red xy plane rendered.
+
 
 # Issues
 
