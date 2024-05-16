@@ -35,7 +35,10 @@ void main() {
 })";
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_mesh();
+
+//! Creates OpenGL texture from image \c fname file and returns texture ID.
 GLuint create_texture(std::string const & fname);
+
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source);
 
 int main(int argc, char * argv[]) {
@@ -71,8 +74,9 @@ int main(int argc, char * argv[]) {
 
 	GLint s_loc = glGetUniformLocation(shader_program, "s");
 	assert(s_loc != -1 && "unknown uniform");
-	glUniform1i(s_loc, 0);
+    glUniform1i(s_loc, 0);
 	glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tbo);  // bind a texture to active texture unit (0)
 
 	while (true) {
 		SDL_Event event;
@@ -108,9 +112,9 @@ GLuint create_texture(std::string const & fname) {
 	GLuint tbo;
 	glGenTextures(1, &tbo);
 	glBindTexture(GL_TEXTURE_2D, tbo);
-	// glPixelStorei() : adresa kazdeho riadku obrazka je zarovnana 4mi (RGBA foramt)
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
+    glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
 
 	return tbo;
 }

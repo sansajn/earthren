@@ -1,6 +1,8 @@
 *.o
 config.log
 .sconsign.dblite
+earthren.creator
+earthren.creator.user
 
 xy_plane
 xy_plane_grid
