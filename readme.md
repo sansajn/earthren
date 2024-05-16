@@ -3,9 +3,22 @@ for more details see earth rendering notes ...
 
 # Samples
 
-The latest sample is `xy_plane_grid.cpp` which shows grid of xy_planes with a zoom and pane features. There is not any camera implementation there.
+## `xy_plane_grid_textured`
+The latest sample is `xy_plane_grid_textured.cpp` which shows grid of xy_planes the same as previous `xy_plane_grid.cpp` sample but with a texture applied.
 
-The problem there is that pane not smooth it has a kind of momentum. Affected samples are `xy_plane_grid` and `xy_plane_panzoom` samples.
+The problem there is that pane is not smooth it has a kind of momentum. Affected samples are `xy_plane_grid.cpp`, `xy_plane_grid` and `xy_plane_panzoom` samples.
+
+ToDo:
+- rewrite pan functionality
+
+Then Next step is to implement a camera which would allow smooth pane and zoom.
+
+
+## `xy_plane_grid`
+
+`xy_plane_grid.cpp`: shows grid of xy_planes with a zoom and pane features. There is not any camera implementation there.
+
+The problem there is that pane is not smooth it has a kind of momentum. Affected samples are `xy_plane_grid` and `xy_plane_panzoom` samples.
 
 ToDo:
 - rewrite pan functionality
