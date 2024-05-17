@@ -16,7 +16,7 @@ ToDo:
 - use VAOs (see `texture_torage` as an example)
 
 
-Then next step is to implement a camera which would allow smooth pane and zoom.
+Then next step is to implement a camera which would allow smooth pane and zoom. I would like to implement *Proland* like camera.
 
 Then next step is to add heights, I need to figure out area for sample tiles (see `data/tiles`), download heights for that area and spit it to tiles. Then modify shader to add texture (ortho) based heights (in this step without any noise or upsampling).
 

@@ -101,41 +101,41 @@ int main(int argc, char * argv[]) {
 	GLuint const shader_program = get_shader_program(vertex_shader_source, fragment_shader_source);
 	
 	GLint const position_loc = glGetAttribLocation(shader_program, "position");
-    GLint const uv_loc = glGetAttribLocation(shader_program, "uv");
+	GLint const uv_loc = glGetAttribLocation(shader_program, "uv");
 	GLint const local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
 	GLint const color_loc = glGetUniformLocation(shader_program, "color");
-    GLint const s_loc = glGetUniformLocation(shader_program, "s");
+	GLint const s_loc = glGetUniformLocation(shader_program, "s");
 	
 	glUseProgram(shader_program);
 
-    // generate texture
+	// generate texture
 	mat4 P = perspective(radians(60.f), WIDTH/(float)HEIGHT, 0.01f, 1000.f);
 	
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
 
-    GLuint vbo[2];  // vertices, texcoords
-    glGenBuffers(2, vbo);
+	GLuint vbo[2];  // vertices, texcoords
+	glGenBuffers(2, vbo);
 
-    // for position attributes
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(xy_plane_verts), xy_plane_verts, GL_STATIC_DRAW);
-    glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(position_loc);
+	// for position attributes
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(xy_plane_verts), xy_plane_verts, GL_STATIC_DRAW);
+	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+	glEnableVertexAttribArray(position_loc);
 
-    // for st attributes
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(xy_plane_texcoords), xy_plane_texcoords, GL_STATIC_DRAW);
-    glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(uv_loc);
+	// for st attributes
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(xy_plane_texcoords), xy_plane_texcoords, GL_STATIC_DRAW);
+	glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+	glEnableVertexAttribArray(uv_loc);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbid current buffer
+	glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbid current buffer
 
-    // grid dimensions
-    constexpr unsigned row_count = 5,
-        col_count = 5;
+	// grid dimensions
+	constexpr unsigned row_count = 5,
+		col_count = 5;
 
-    vector<GLuint> tiles = read_tiles();
+	vector<GLuint> tiles = read_tiles();
 
 	float distance = 2.0f;
 	vec2 xy_offset = vec2{0, 0};
@@ -187,31 +187,31 @@ int main(int argc, char * argv[]) {
 		glClear(GL_COLOR_BUFFER_BIT);  // clear buffer
 
 		// draw grid of xy planes
-        for (unsigned row = 0; row < row_count; ++row) {
-            for (unsigned col = 0; col < col_count; ++col) {
-                // bind texture to a sampler (this is not changing)
-                GLuint const & tile = tiles[col + row*col_count];
-                glUniform1i(s_loc, 0);  // set sampler s to use texture unit 0
-                glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-                glBindTexture(GL_TEXTURE_2D, tile);  // bind a texture to active texture unit (0)
+		for (unsigned row = 0; row < row_count; ++row) {
+			for (unsigned col = 0; col < col_count; ++col) {
+				// bind texture to a sampler (this is not changing)
+				GLuint const & tile = tiles[col + row*col_count];
+				glUniform1i(s_loc, 0);  // set sampler s to use texture unit 0
+				glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+				glBindTexture(GL_TEXTURE_2D, tile);  // bind a texture to active texture unit (0)
 
 				float const model_scale = 2.0f;
-                vec2 model_pos = (vec2{col, row} - vec2(col_count, row_count)/2.0f) * model_scale;
+				vec2 model_pos = (vec2{col, row} - vec2(col_count, row_count)/2.0f) * model_scale;
 				mat4 M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 				mat4 local_to_screen = P*V*M;
 				glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 				
-                vec3 color = (col + (row*col_count)) % 2 ? vec3{1, 0, 0} : vec3{0, 0, 1};
+				vec3 color = (col + (row*col_count)) % 2 ? vec3{1, 0, 0} : vec3{0, 0, 1};
 				glUniform3f(color_loc, color.r, color.g, color.b);
 				
 				glDrawArrays(GL_TRIANGLES, 0, 6);
 			}
 		}
 
-		SDL_GL_SwapWindow(window);
+	  SDL_GL_SwapWindow(window);
 	}
 	
-    glDeleteBuffers(2, vbo);
+	glDeleteBuffers(2, vbo);
 	glDeleteProgram(shader_program);
 
 	SDL_GL_DeleteContext(context);
@@ -222,21 +222,21 @@ int main(int argc, char * argv[]) {
 }
 
 vector<GLuint> read_tiles() {
-    // OSM tiles are are addresed from left-bottom corner (so we need to flip y coordinate)
-    constexpr unsigned from_x = 2210,
-        to_x = 2215,
-        from_y = 1386,
-        to_y = 1391;
+	// OSM tiles are are addresed from left-bottom corner (so we need to flip y coordinate)
+	constexpr unsigned from_x = 2210,
+		to_x = 2215,
+		from_y = 1386,
+		to_y = 1391;
 
-    vector<GLuint> tiles;
-    tiles.reserve(25);
-    for (unsigned y = to_y-1; y >= from_y; --y) {
-        for (unsigned x = from_x; x < to_x; ++x) {
-            string tile_name = fmt::format("{}_{}.png", x, y);
-            tiles.push_back(create_texture("data/tiles/"s + tile_name));
-        }
-    }
-    return tiles;
+	vector<GLuint> tiles;
+	tiles.reserve(25);
+	for (unsigned y = to_y-1; y >= from_y; --y) {
+		for (unsigned x = from_x; x < to_x; ++x) {
+			string tile_name = fmt::format("{}_{}.png", x, y);
+			tiles.push_back(create_texture("data/tiles/"s + tile_name));
+		}
+	}
+	return tiles;
 }
 
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source) {
@@ -287,17 +287,17 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 }
 
 GLuint create_texture(std::string const & fname) {
-    Magick::Image im{fname};
-    im.flip();
-    Magick::Blob imblob;
-    im.write(&imblob, "RGBA");  // load image as rgba array
+	Magick::Image im{fname};
+	im.flip();
+	Magick::Blob imblob;
+	im.write(&imblob, "RGBA");  // load image as rgba array
 
-    GLuint tbo;
-    glGenTextures(1, &tbo);
-    glBindTexture(GL_TEXTURE_2D, tbo);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
-    glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
+	GLuint tbo;
+	glGenTextures(1, &tbo);
+	glBindTexture(GL_TEXTURE_2D, tbo);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
+	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
 
-    return tbo;
+	return tbo;
 }
