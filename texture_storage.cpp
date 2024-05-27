@@ -74,9 +74,9 @@ int main(int argc, char * argv[]) {
 
 	GLint s_loc = glGetUniformLocation(shader_program, "s");
 	assert(s_loc != -1 && "unknown uniform");
-    glUniform1i(s_loc, 0);
+	glUniform1i(s_loc, 0);
 	glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tbo);  // bind a texture to active texture unit (0)
+	glBindTexture(GL_TEXTURE_2D, tbo);  // bind a texture to active texture unit (0)
 
 	while (true) {
 		SDL_Event event;

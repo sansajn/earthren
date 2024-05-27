@@ -6,3 +6,4 @@ xy_plane_grid.cpp
 xy_plane_grid_textured.cpp
 xy_plane_panzoom.cpp
 xy_plane_texture.cpp
+map_camera.cpp

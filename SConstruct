@@ -26,6 +26,7 @@ def build():
 	env.Program(['texture_storage.cpp'])
 	env.Program(['xy_plane_texture.cpp'])
 	env.Program(['xy_plane_grid_textured.cpp'])
+	env.Program(['map_camera.cpp'])
 
 def configure(env, dependency_list):
 	conf = env.Configure(

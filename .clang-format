@@ -3,3 +3,4 @@ BasedOnStyle: LLVM
 UseTab: Always
 TabWidth: 3
 IndentWidth: 3
+ContinuationIndentWidth: 3

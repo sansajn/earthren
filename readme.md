@@ -3,6 +3,21 @@ for more details see earth rendering notes ...
 
 # Samples
 
+## `map_camera`
+
+The latest sample is `map_camera` which shows orbital camera implementation allows to rotate around z-axis and x-axis with a mouse move.
+
+ToDo:
+- glmprint: reformat `glmprint.h` library
+- glmprint: get aligne to numpy printing (vector, matrix) output
+
+### Issues
+
+1. Pan functionality is not written in a good way, because cursor doesn't stay at the same map position and that create artifacts when pan.
+
+2. I want to calculate with double precision and do graphics with a float precision.
+
+
 ## `xy_plane_grid_textured`
 
 The latest sample is `xy_plane_grid_textured.cpp` which shows grid of xy_planes the same as previous `xy_plane_grid.cpp` sample but with a texture applied.
@@ -46,6 +61,9 @@ Problems:
 
 Shows how to render a picture to screen.
 
+Issues:
+- VAOs are used incorrect way in a sample, see `map_camera` sample to learn how to use it
+
 
 ## `xy_plane_panzoom`
 
@@ -55,6 +73,17 @@ xy plane with zoom and pane capabilities
 ## `xy_plane`
 
 Just a simple red xy plane rendered.
+
+# Formatting
+
+Formatting source code is done by `.clang-format` configuration file. To see LLVM style defaults run 
+
+```bash
+clang-format -style=llvm -dump-config > .clang-format
+```
+
+command.
+
 
 
 # Issues
