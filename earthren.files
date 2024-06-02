@@ -7,3 +7,5 @@ xy_plane_grid_textured.cpp
 xy_plane_panzoom.cpp
 xy_plane_texture.cpp
 map_camera.cpp
+height_map.cpp
+height_sinxy.cpp

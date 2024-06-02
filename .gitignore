@@ -3,6 +3,7 @@ config.log
 .sconsign.dblite
 earthren.creator
 earthren.creator.user
+.qtc_clangd/
 
 xy_plane
 xy_plane_grid
@@ -11,3 +12,4 @@ texture_storage
 xy_plane_texture
 xy_plane_grid_textured
 map_camera
+height_map

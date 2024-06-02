@@ -2,9 +2,16 @@
 # version dependencies for different targets and also to build any of the 
 # target all dependencies needs to be met.
 
+AddOption('--build-debug', action='store_true', dest='build_debug', default=False)
+
+
 def build():
 	cpp20_env = Environment(
-		CXXFLAGS=['-std=c++20'], CFLAGS=['-Wall'])
+	   CXXFLAGS=['-std=c++20'], CCFLAGS=['-Wall', '-Wextra'],
+		LIBS = ['tiffxx'])
+
+	if GetOption('build_debug'):
+		cpp20_env.Append(CCFLAGS=['-g', '-O0', '-D_DEBUG'])
 
 	# for OpenGL samples
 
@@ -14,7 +21,8 @@ def build():
 		('glm', '>= 0.9.9.5'),
 		('sdl2', '>= 2.0.20'),
 		('glesv2', '>= 3.2'),
-		('Magick++', '>= 6.9.11')
+		('Magick++', '>= 6.9.11'),
+		('libtiff-4', '>= 4.3.0')
 	]
 
 	env = cpp20_env.Clone()
@@ -27,6 +35,8 @@ def build():
 	env.Program(['xy_plane_texture.cpp'])
 	env.Program(['xy_plane_grid_textured.cpp'])
 	env.Program(['map_camera.cpp'])
+	env.Program(['height_sinxy.cpp'])
+	env.Program(['height_map.cpp'])
 
 def configure(env, dependency_list):
 	conf = env.Configure(
