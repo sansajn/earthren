@@ -1,4 +1,4 @@
-// OpenGL ES 3.2, terrain with heights from height map texture
+// OpenGL ES 3.2, plot of z=sin(x)*sin(y) surface
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -11,13 +11,14 @@
 #include <cassert>
 #include <cstddef>
 #include <fmt/core.h>
+#include <boost/filesystem/string_file.hpp>
 #include <SDL.h>
 #include <GLES3/gl32.h>
 #include <glm/matrix.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/matrix_inverse.hpp>
-#include "glmprint.hpp"
+#include <Magick++.h>
+// #include "glmprint.hpp"  // uncomment in case of debug
 
 using std::vector, std::string, std::tuple, std::pair, std::byte;
 using std::unique_ptr;
@@ -26,6 +27,7 @@ using std::cout, std::endl;
 using fmt::print;
 using std::chrono::steady_clock, std::chrono::duration_cast, 
 	std::chrono::milliseconds;
+using boost::filesystem::load_string_file;
 using glm::mat4,
 	glm::vec4, glm::vec3, glm::vec2,
 	glm::value_ptr,
@@ -38,50 +40,23 @@ using namespace std::string_literals;
 constexpr GLuint WIDTH = 800,
 	HEIGHT = 600;
 
-GLchar const * vertex_shader_source = R"(
-#version 320 es
-in vec3 position;  // expected to be in a range of ((0,0), (1,1)) square
-out vec3 n;
-
-uniform mat4 local_to_screen;
-uniform mat3 normal_to_view;
-
-const float PI = 3.14159265359;
-
-void main() {
-	// calculate z value
-	vec2 sinxy = sin(position.xy * PI);  // from 0..pi range
-	float z = sinxy.x * sinxy.y;
-	vec3 pos = vec3(position.xy, z);
-
-	// calculate normal, be aware that we are in a model space
-	vec2 cosxy = cos(position.xy * PI);
-	vec3 dF = vec3(cosxy.x*sinxy.y, sinxy.x*cosxy.y, -1);
-	n = normal_to_view * normalize(-dF);
-
-	gl_Position = local_to_screen * vec4(pos, 1.0);
-})";
-
-GLchar const * fragment_shader_source = R"(
-#version 320 es
-precision mediump float;
-
-in vec3 n;  // fragment normal in view space
-vec3 color = vec3(0.7, 0.7, 0.7);
-vec3 light_dir = normalize(vec3(0, 0, 1));
-out vec4 frag_color;
-
-void main() {
-	frag_color = vec4(max(dot(n, light_dir), 0.0)*color, 1.0);
-})";
+path const VERTEX_SHADER_FILE = "height_sinxy_map.vs",
+	FRAGMENT_SHADER_FILE = "height_sinxy_map.fs";
+path const HEIGHT_MAP_TEXTURE = "data/sinxy.png";
 
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source);
+
+//! Creates OpenGL texture from image \c fname file and returns texture ID.
+GLuint create_texture(path const & fname);
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc);
 
 /*! Creates quad mesh on GPU with a size=1.
 \return (vao, vbo, vertex_count) tuple. */
 tuple<GLuint, GLuint, unsigned> create_mesh(GLint vertices_loc, GLint uv_loc);
+
+/*! Returns vector of data in a (position:3, texcoord:2) format per vertex and array of indices to form a model. */
+pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h);
 
 constexpr float pi = glm::pi<float>();
 
@@ -136,7 +111,7 @@ struct input_mode {
 bool process_user_events(map_camera & cam, input_mode & mode);
 
 
-int main(int argc, char * argv[]) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
@@ -155,15 +130,23 @@ int main(int argc, char * argv[]) {
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 
-	GLuint const shader_program = get_shader_program(vertex_shader_source, fragment_shader_source);
+	// laod shader programs
+	string vertex_shader,
+		fragment_shader;
+	load_string_file(VERTEX_SHADER_FILE.c_str(), vertex_shader);
+	load_string_file(FRAGMENT_SHADER_FILE.c_str(), fragment_shader);
+
+	GLuint const shader_program = get_shader_program(vertex_shader.c_str(), fragment_shader.c_str());
 	
 	GLint const position_loc = glGetAttribLocation(shader_program, "position");
 	GLint const local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
-	GLint const normal_to_view_loc = glGetUniformLocation(shader_program, "normal_to_view");
+	GLint const heights_loc = glGetUniformLocation(shader_program, "heights");
 	
 	glUseProgram(shader_program);
 
-	// generate texture
+	// load texture
+	GLuint heights_tex = create_texture(HEIGHT_MAP_TEXTURE);
+
 	mat4 const P = perspective(radians(60.f), WIDTH/(float)HEIGHT, 0.01f, 1000.f);
 	
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -194,14 +177,16 @@ int main(int argc, char * argv[]) {
 
 		glBindVertexArray(vao);
 
+		// bind height map
+		glUniform1i(heights_loc, 0);  // set sampler s to use texture unit 0
+		glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+		glBindTexture(GL_TEXTURE_2D, heights_tex);  // bind a texture to active texture unit (0)
+
 		float const model_scale = 2.0f;
 		vec2 model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
 		mat4 M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 		mat4 local_to_screen = P*V*M;
 		glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
-
-		glm::mat3 normal_to_view = glm::mat3{glm::inverseTranspose(V*M)};
-		glUniformMatrix3fv(normal_to_view_loc, 1, GL_FALSE, value_ptr(normal_to_view));
 
 		glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 
@@ -212,6 +197,9 @@ int main(int argc, char * argv[]) {
 	glDeleteBuffers(1, &ibo);
 	glDeleteBuffers(1, &vbo);
 	glDeleteVertexArrays(1, &vao);
+
+	glDeleteTextures(1, &heights_tex);
+
 	glDeleteProgram(shader_program);
 
 	SDL_GL_DeleteContext(context);
@@ -219,6 +207,22 @@ int main(int argc, char * argv[]) {
 	SDL_Quit();
 	
 	return 0;
+}
+
+GLuint create_texture(path const & fname) {
+	Magick::Image im{fname};
+	im.flip();
+	Magick::Blob imblob;
+	im.write(&imblob, "GRAY");  // load image as grayscale
+
+	GLuint tbo;
+	glGenTextures(1, &tbo);
+	glBindTexture(GL_TEXTURE_2D, tbo);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, im.columns(), im.rows());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RED, GL_UNSIGNED_BYTE, imblob.data());
+	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
+
+	return tbo;
 }
 
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source) {
@@ -268,64 +272,11 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 	return shader_program;
 }
 
-// TODO: we do not need normals and texcoords
-/*! Returns vector of data in a (position:3, texcoord:2, normal:3) format per vertex and array of indices to form a model. */
-pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
-	assert(w > 1 && h > 1 && "invalid dimensions");
-
-	// vertices
-	float const dx = 1.0f/(w-1),
-		dy = 1.0f/(h-1);
-	std::vector<float> verts((3+2+3)*w*h);  // position:3, texcoord:2, normal:3
-
-	float * vdata = verts.data();
-	for (int j = 0; j < h; ++j) {
-		float py = j*dy;
-		for (int i = 0; i < w; ++i) {
-			float px = i*dx;
-			*vdata++ = px;  // position
-			*vdata++ = py;
-			*vdata++ = 0;
-			*vdata++ = px;  // texcoord
-			*vdata++ = py;
-			*vdata++ = 0;  // normal
-			*vdata++ = 0;
-			*vdata++ = 1;
-		}
-	}
-
-	// indices
-	unsigned const nindices = 2*(w-1)*(h-1)*3;
-	std::vector<unsigned> indices(nindices);
-	unsigned * idata = indices.data();
-	for (int j = 0; j < h-1; ++j) {
-		unsigned yoffset = j*w;
-		for (int i = 0; i < w-1; ++i) {
-			int n = i + yoffset;
-			*(idata++) = n;
-			*(idata++) = n+1;
-			*(idata++) = n+1+w;
-			*(idata++) = n+1+w;
-			*(idata++) = n+w;
-			*(idata++) = n;
-		}
-	}
-
-	// TODO: I don't want to use ash there. What are other options?
-	// Mesh m{verts.data(), (3+2+3)*verts.size(), indices.data(), indices.size()};
-	// unsigned stride = (3+2+3)*sizeof(float);
-	// m.attach_attributes({
-	// 	typename Mesh::vertex_attribute_type{0, 3, GL_FLOAT, stride, 0},
-	// 	typename Mesh::vertex_attribute_type{1, 2, GL_FLOAT, stride, 3*sizeof(float)},
-	// 	typename Mesh::vertex_attribute_type{2, 3, GL_FLOAT, stride, (3+2)*sizeof(float)}});
-
-	// return m;
-
-	return {verts, indices};
-}
-
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
-	auto [vertices, indices] = make_quad(100, 100);  // TODO: we need to figure out proper dimensions there
+	constexpr unsigned quad_w = 100,
+		quad_h = 100;
+
+	auto [vertices, indices] = make_quad(quad_w, quad_h);
 
 	GLuint vao = 0;
 	glGenVertexArrays(1, &vao);
@@ -341,13 +292,64 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
 
-	// x,y,z
-	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, (3+2+3)*sizeof(float), (GLvoid*)0);
+	// bind (x,y,z) data
+	constexpr size_t stride = (3+2)*sizeof(float);
+	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)0);
 	glEnableVertexAttribArray(position_loc);
 
 	glBindVertexArray(0);  // unbind vertex array
 
 	return {vao, vbo, ibo, size(indices)};
+}
+
+pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
+	assert(w > 1 && h > 1 && "invalid dimensions");
+
+	// vertices
+	float const dx = 1.0f/(w-1),
+		dy = 1.0f/(h-1);
+	vector<float> verts((3+2+3)*w*h);  // position:3, texcoord:2
+
+	float * vdata = verts.data();
+	for (unsigned j = 0; j < h; ++j) {
+		float py = j*dy;
+		for (unsigned i = 0; i < w; ++i) {
+			float px = i*dx;
+			*vdata++ = px;  // position
+			*vdata++ = py;
+			*vdata++ = 0;
+			*vdata++ = px;  // texcoord
+			*vdata++ = py;
+		}
+	}
+
+	// indices
+	unsigned const nindices = 2*(w-1)*(h-1)*3;
+	vector<unsigned> indices(nindices);
+	unsigned * idata = indices.data();
+	for (unsigned j = 0; j < h-1; ++j) {
+		unsigned yoffset = j*w;
+		for (unsigned i = 0; i < w-1; ++i) {
+			unsigned n = i + yoffset;
+			*(idata++) = n;
+			*(idata++) = n+1;
+			*(idata++) = n+1+w;
+			*(idata++) = n+1+w;
+			*(idata++) = n+w;
+			*(idata++) = n;
+		}
+	}
+
+	// TODO: I don't want to use ash there. What are other options?
+	// Mesh m{verts.data(), (3+2)*verts.size(), indices.data(), indices.size()};
+	// unsigned stride = (3+2)*sizeof(float);
+	// m.attach_attributes({
+	// 	typename Mesh::vertex_attribute_type{0, 3, GL_FLOAT, stride, 0},
+	// 	typename Mesh::vertex_attribute_type{1, 2, GL_FLOAT, stride, 3*sizeof(float)},
+
+	// return m;
+
+	return {verts, indices};
 }
 
 bool process_user_events(map_camera & cam, input_mode & mode) {

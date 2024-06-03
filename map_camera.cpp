@@ -165,6 +165,7 @@ int main(int argc, char * argv[]) {
 		float const dt = duration_cast<milliseconds>(t_now - t_prev).count() / 1000.0f;
 		t_prev = t_now;
 
+		// TODO: wrong event handling  there, see  height_sinxy sample
 		SDL_Event event;
 		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
 			break;
@@ -278,6 +279,9 @@ int main(int argc, char * argv[]) {
 		SDL_GL_SwapWindow(window);
 	}
 	
+	for(auto tile : tiles)  // delete tile textures
+		glDeleteTextures(1, &tile);
+
 	glDeleteBuffers(1, &vbo);
 	glDeleteVertexArrays(1, &vao);
 	glDeleteProgram(shader_program);
@@ -405,5 +409,5 @@ tuple<GLuint, GLuint, unsigned> create_mesh(GLint vertices_loc, GLint uv_loc) {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbind buffer
 	glBindVertexArray(0);  // unbind vertex array
 
-	return {vao, vbo, vertex_count};  // TODO: remove vbo_tex
+	return {vao, vbo, vertex_count};
 }

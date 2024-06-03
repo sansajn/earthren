@@ -8,7 +8,7 @@ AddOption('--build-debug', action='store_true', dest='build_debug', default=Fals
 def build():
 	cpp20_env = Environment(
 	   CXXFLAGS=['-std=c++20'], CCFLAGS=['-Wall', '-Wextra'],
-		LIBS = ['tiffxx'])
+		LIBS = ['tiffxx', 'boost_filesystem'])
 
 	if GetOption('build_debug'):
 		cpp20_env.Append(CCFLAGS=['-g', '-O0', '-D_DEBUG'])
@@ -36,6 +36,8 @@ def build():
 	env.Program(['xy_plane_grid_textured.cpp'])
 	env.Program(['map_camera.cpp'])
 	env.Program(['height_sinxy.cpp'])
+	env.Program(['plot_sinxy.cpp'])
+	env.Program(['height_sinxy_map.cpp'])
 	env.Program(['height_map.cpp'])
 
 def configure(env, dependency_list):

@@ -12,4 +12,7 @@ texture_storage
 xy_plane_texture
 xy_plane_grid_textured
 map_camera
+height_sinxy
+plot_sinxy
+height_sinxy_map
 height_map
