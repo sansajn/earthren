@@ -12,4 +12,17 @@ plot_sinxy.cpp
 height_sinxy_map.cpp
 height_sinxy_map.vs
 height_sinxy_map.fs
+
+camera.cpp
+camera.h
+
+height_sinxy_normals.cpp
+height_sinxy_normals.vs
+height_sinxy_normals.fs
+
 height_map.cpp
+sinxy_heights.cpp
+
+height_sinxy_normals_fce.cpp
+height_sinxy_normals_fce.vs
+height_sinxy_normals_fce.fs

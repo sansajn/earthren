@@ -18,6 +18,18 @@ command (e.g. `scons -j8 height_sinxy`).
 
 # Samples
 
+## `height_sinxy_normals`
+
+`Height_sinxy_normals` shows how to read heights and calculate normals out of 16bit height map in a vertex shader program. The sample is based on previous [[#`height_sinxy_map`]] sample. 
+
+![](docasset/height_sinxy_normals.png)
+
+## `height_sinxy_normals_fce`
+
+This sample is a modification of [[#`height_sinxy_normals`]] where normals are not calculated from height map, but by exact function.  See [[#`height_sinxy_map`]] sample for $sinxy$ function description.
+
+![](docasset/height_sinxy_normals_fce.png)
+
 ## `height_sinxy_map`
 
 `Height_sinxy_map` sample is similar to `plot_sinxy` sample, but instead of calculating $z$ value in a vertex shader we want to have a height map (generated in CPU part of the program by $z=\sin(x) \cdot \sin(y)$ for $x,y \in [0, \pi]$ equation).

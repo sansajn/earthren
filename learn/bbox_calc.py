@@ -16,14 +16,16 @@ def get_tile_bounding_box(x, y, zoom):
     lon_br, lat_br = tile_to_lon_lat(x + 1, y + 1, zoom)
     return (lon_tl, lat_tl, lon_br, lat_br)
 
-# Example usage
+plzen_tile = (2200, 1393, 12)
+prague_tile = (2210, 1386, 12)
+
+prague_bbox = get_tile_bounding_box(*prague_tile)
+print(f'Prague bounding box: {prague_bbox}')
+
+plzen_bbox = get_tile_bounding_box(*plzen_tile)
+print(f'Plzen bounding box: {plzen_bbox}')
+
 zoom = 12
-x = 2210
-y = 1386
-
-bounding_box = get_tile_bounding_box(x, y, zoom)
-print("Bounding Box:", (bounding_box[1], bounding_box[0], bounding_box[3], bounding_box[2]))
-
 from_x = 2210
 to_x = 2214
 from_y = 1386

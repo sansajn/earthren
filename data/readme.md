@@ -22,6 +22,8 @@ Band 1 Block=1582x2 Type=Int16, ColorInterp=Gray
   NoData Value=-32768
 ```
 
+> TODO: what is SRC of DEM data?
+
 
 `tiles`: manually downloaded area covers prague
 

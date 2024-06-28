@@ -38,7 +38,10 @@ def build():
 	env.Program(['height_sinxy.cpp'])
 	env.Program(['plot_sinxy.cpp'])
 	env.Program(['height_sinxy_map.cpp'])
-	env.Program(['height_map.cpp'])
+	env.Program(['height_sinxy_normals.cpp', 'camera.cpp'])
+	env.Program(['height_sinxy_normals_fce.cpp', 'camera.cpp'])
+	env.Program(['sinxy_heights.cpp'])
+	env.Program(['height_map.cpp', 'camera.cpp'])
 
 def configure(env, dependency_list):
 	conf = env.Configure(
