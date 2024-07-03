@@ -26,3 +26,8 @@ sinxy_heights.cpp
 height_sinxy_normals_fce.cpp
 height_sinxy_normals_fce.vs
 height_sinxy_normals_fce.fs
+
+normals.cpp
+normal.vs
+normal.gs
+normal.fs

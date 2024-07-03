@@ -18,11 +18,29 @@ command (e.g. `scons -j8 height_sinxy`).
 
 # Samples
 
+## `normals`
+
+`Normals` sample shown how to visualize computed normals. It is based on [[#`height_sinxy_normals`]] sample.
+
+![](docasset/normals.png)
+
+What is new:
+- geometry shader used
+- two shader program used
+- render features used (e.g. normals)
+- events features used (`zoom_in` event)
+
 ## `height_sinxy_normals`
 
 `Height_sinxy_normals` shows how to read heights and calculate normals out of 16bit height map in a vertex shader program. The sample is based on previous [[#`height_sinxy_map`]] sample. 
 
 ![](docasset/height_sinxy_normals.png)
+
+What is new:
+- 16bit height map used
+- shows how to use indices (IBO) for a mesh creation.
+- use depth buffer (`GL_DEPTH_TEST`)
+- use `GL_CULL_FACE` testing
 
 ## `height_sinxy_normals_fce`
 
