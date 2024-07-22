@@ -93,8 +93,6 @@ struct render_features {
 bool process_user_events(map_camera & cam, input_mode & mode, render_features & features,
 	input_events & events);
 
-void test_save_heightmap();
-
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
@@ -139,9 +137,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLint const normal_position_loc = glGetAttribLocation(normal_shader_program, "position");
 	GLint const normal_heights_loc = glGetUniformLocation(normal_shader_program, "heights");
 	GLint const normal_local_to_screen_loc = glGetUniformLocation(normal_shader_program, "local_to_screen");
-
-	// use scene program
-	// glUseProgram(shader_program);
 
 	// load texture
 	GLuint const heights_tex = create_texture_16b(HEIGHT_MAP_TEXTURE);
@@ -292,7 +287,6 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 	// geometry shader
 	GLint geometry_shader = -1;
 	if (geometry_shader_source) {
-		// TODO: build eometry shader ...
 		geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
 		glShaderSource(geometry_shader, 1, &geometry_shader_source, nullptr);
 		glCompileShader(geometry_shader);

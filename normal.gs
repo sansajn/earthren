@@ -1,7 +1,7 @@
 #version 320 es
 
 /* geometry shader proram to visualize normals
-Implementation takes normal for each (triangle) vertex and creates a line for each point representing normal. */
+Implementation expects triangles and for each trianlge vertex it draws a normal calculated by a vertex shader program. */
 
 layout(triangles) in;
 layout(line_strip, max_vertices = 6) out;

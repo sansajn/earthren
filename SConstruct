@@ -22,7 +22,8 @@ def build():
 		('sdl2', '>= 2.0.20'),
 		('glesv2', '>= 3.2'),
 		('Magick++', '>= 6.9.11'),
-		('libtiff-4', '>= 4.3.0')
+		('libtiff-4', '>= 4.3.0'),
+		('spdlog', '>= 1.9.2')  # libspdlog-dev
 	]
 
 	env = cpp20_env.Clone()
@@ -41,7 +42,7 @@ def build():
 	env.Program(['height_sinxy_normals.cpp', 'camera.cpp'])
 	env.Program(['height_sinxy_normals_fce.cpp', 'camera.cpp'])
 	env.Program(['sinxy_heights.cpp'])
-	env.Program(['height_map.cpp', 'camera.cpp'])
+	env.Program(['height_map.cpp', 'camera.cpp', 'free_camera.cpp'])
 	env.Program(['normals.cpp', 'camera.cpp'])
 
 def configure(env, dependency_list):

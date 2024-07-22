@@ -1,3 +1,4 @@
+#pragma once
 #include <glm/matrix.hpp>
 
 // TODO: give a sample how camera is meant to be used
@@ -13,6 +14,6 @@ struct map_camera {
 
 	void update();
 
- private:
+private:
 	glm::mat4 _view;  //!< Camera view transformation matrix.
 };
