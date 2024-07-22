@@ -202,6 +202,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	GLint const normal_heights_loc = glGetUniformLocation(normal_shader_program, "heights");
 	GLint const normal_height_map_size_loc = glGetUniformLocation(normal_shader_program, "height_map_size");
+	GLint const normal_height_scale_loc = glGetUniformLocation(normal_shader_program, "height_scale");
 	GLint const normal_local_to_screen_loc = glGetUniformLocation(normal_shader_program, "local_to_screen");
 	GLint const normal_line_color_loc = glGetUniformLocation(normal_shader_program, "fill_color");
 
@@ -221,6 +222,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
 	GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
+	GLint const lightdir_height_scale_loc = glGetUniformLocation(lightdir_shader_program, "height_scale");
 	GLint const lightdir_local_to_screen_loc = glGetUniformLocation(lightdir_shader_program, "local_to_screen");
 	GLint const lightdir_line_color_loc = glGetUniformLocation(lightdir_shader_program, "fill_color");
 
@@ -240,6 +242,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	GLint const outline_heights_loc = glGetUniformLocation(outline_shader_program, "heights");
 	GLint const outline_height_map_size_loc = glGetUniformLocation(outline_shader_program, "height_map_size");
+	GLint const outline_height_scale_loc = glGetUniformLocation(outline_shader_program, "height_scale");
 	GLint const outline_local_to_screen_loc = glGetUniformLocation(outline_shader_program, "local_to_screen");
 	GLint const outline_line_color_loc = glGetUniformLocation(outline_shader_program, "fill_color");
 
@@ -324,22 +327,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 				<< with_label{"local_to_screen", local_to_screen};
 		}
 
+		float const height_scale = real_elevation_data ? 100.0f : 1.0f;
+
 		// render terrain
 		if (features.show_terrain) {
 			glUseProgram(shader_program);
 
-			// bind height texture
+			// bind height map texture
 			// GLuint const & tile = tiles[0];  // TODO: we do not need list of tiles, just a tile
 			glUniform1i(heights_loc, 0);  // set sampler s to use texture unit 0
 			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
 			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 			glUniform2f(height_map_size_loc, texture_width, texture_height);
-
-			// TODO: can we set uniform before we use a program?
-			float height_scale = real_elevation_data ? 100.0f : 1.0f;
-			glUniform1f(height_scale_loc, height_scale);
-
+			glUniform1f(height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
 			glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
@@ -351,12 +352,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 			glUniform3fv(normal_line_color_loc, 1, value_ptr(rgb::lime));
 
-			// bind height map
+			// bind height map texture
 			glUniform1i(normal_heights_loc, 0);  // set sampler s to use texture unit 0
 			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
 			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 			glUniform2f(normal_height_map_size_loc, texture_width, texture_height);
+			glUniform1f(normal_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
 			glUniformMatrix4fv(normal_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
@@ -374,6 +376,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 			glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
+			glUniform1f(lightdir_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
 			glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
@@ -391,6 +394,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 			glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
+			glUniform1f(outline_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
 			glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);

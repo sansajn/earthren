@@ -9,10 +9,9 @@ out vec3 normal;
 
 uniform usampler2D heights;  // 16bit UI height texture
 uniform vec2 height_map_size;  // height map (width, height) in pixels
+uniform float height_scale;  // e.g. 1 for PNG files or 100 for TIFF (elevation) files
 
 const float PI = 3.14159265359;
-
-const float height_scale = 100.0;
 
 // st \in [0,1]^2, h \in [0,1]
 vec3 to_word(vec2 st, float h) {
@@ -49,8 +48,7 @@ void main() {
 	normal = calculate_normal(st, heights);
 
    // read h value from height map
-	// TODO: we are staling heights, but normals are calculated without scaling (that is wrong)
-	float h = (float(texture(heights, st).r)*height_scale)/65535.0;  // pixel values are normalized to 0..1
+	float h = float(texture(heights, st).r)/65535.0 * height_scale;  // pixel values are normalized to 0..1
 
    gl_Position = vec4(position.xy, h, 1);
 }
