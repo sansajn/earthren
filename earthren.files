@@ -44,3 +44,6 @@ height_map_outline.vs
 color.hpp
 free_camera.hpp
 free_camera.cpp
+
+geoms_plane.cpp
+geoms_plane.vs
