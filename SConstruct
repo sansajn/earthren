@@ -44,6 +44,8 @@ def build():
 	env.Program(['sinxy_heights.cpp'])
 	env.Program(['height_map.cpp', 'camera.cpp', 'free_camera.cpp'])
 	env.Program(['normals.cpp', 'camera.cpp'])
+	env.Program(['geoms_plane.cpp', 'camera.cpp'])
+	env.Program(['gs_triangle_broken.cpp', 'camera.cpp', 'free_camera.cpp'])
 
 def configure(env, dependency_list):
 	conf = env.Configure(

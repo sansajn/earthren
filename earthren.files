@@ -44,3 +44,14 @@ height_map_outline.vs
 color.hpp
 free_camera.hpp
 free_camera.cpp
+
+geoms_plane.cpp
+geoms_plane_normal.vs
+geoms_plane_facen.vs
+geoms_plane.gs
+to_line_v0.gs
+to_normal.gs
+
+gs_triangle_broken.cpp
+gs_triangle_broken.vs
+gs_triangle_broken.gs
