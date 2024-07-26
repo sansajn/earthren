@@ -47,8 +47,8 @@ constexpr GLuint WIDTH = 800,
 path const VERTEX_SHADER_FILE = "height_sinxy_normals.vs",
 	FRAGMENT_SHADER_FILE = "height_sinxy_normals.fs",
 	NORMAL_VERTEX_SHADER_FILE = "normal.vs",
-	NORMAL_FRAGMENT_SHADER_FILE = "normal.fs",
-	NORMAL_GEOMETRY_SHADER_FILE = "normal.gs";
+	NORMAL_GEOMETRY_SHADER_FILE = "to_normal.gs",
+	NORMAL_FRAGMENT_SHADER_FILE = "normal.fs";
 
 path const HEIGHT_MAP_TEXTURE = "data/sinxy512_16.png";
 
