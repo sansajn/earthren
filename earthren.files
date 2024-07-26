@@ -47,3 +47,8 @@ free_camera.cpp
 
 geoms_plane.cpp
 geoms_plane.vs
+geoms_plane.gs
+
+gs_triangle_broken.cpp
+gs_triangle_broken.vs
+gs_triangle_broken.gs

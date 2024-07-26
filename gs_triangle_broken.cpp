@@ -46,8 +46,8 @@ using namespace std::string_literals;
 constexpr GLuint WIDTH = 800,
 	HEIGHT = 600;
 
-path const NORMAL_VERTEX_SHADER_FILE = "geoms_plane.vs",
-	NORMAL_GEOMETRY_SHADER_FILE = "geoms_plane.gs",
+path const NORMAL_VERTEX_SHADER_FILE = "gs_triangle_broken.vs",
+	NORMAL_GEOMETRY_SHADER_FILE = "gs_triangle_broken.gs",
 	NORMAL_FRAGMENT_SHADER_FILE = "colored.fs";
 
 GLint get_shader_program(char const * vertex_shader_source,
@@ -58,15 +58,6 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc);
 /*! Creates quad mesh on GPU with a size=1.
 \return (vao, vbo, vertex_count) tuple. */
 tuple<GLuint, GLuint, unsigned> create_mesh(GLint vertices_loc, GLint uv_loc);
-
-/*! Returns vector of data in a (position:3, texcoord:2) format per vertex and array of indices to form a model.
-To create a OpenGL object use code
-auto [vertices, indices] = make_quad(quad_w, quad_h);
-// ...
-glBufferData(GL_ARRAY_BUFFER, size(vertices)*sizeof(float), vertices.data(), GL_STATIC_DRAW);
-glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
-\endcoode */
-pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h);
 
 constexpr float pi = glm::pi<float>();
 
@@ -531,61 +522,15 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 	return shader_program;
 }
 
-pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
-	assert(w > 1 && h > 1 && "invalid dimensions");
-
-	// vertices
-	float const dx = 1.0f/(w-1),
-		dy = 1.0f/(h-1);
-	vector<float> verts((3+2)*w*h);  // position:3, texcoord:2
-
-	float * vdata = verts.data();
-	for (unsigned j = 0; j < h; ++j) {
-		float py = j*dy;
-		for (unsigned i = 0; i < w; ++i) {
-			float px = i*dx;
-			*vdata++ = px;  // position
-			*vdata++ = py;
-			*vdata++ = 0;
-			*vdata++ = px;  // texcoord
-			*vdata++ = py;
-		}
-	}
-
-	// indices
-	unsigned const nindices = 2*(w-1)*(h-1)*3;
-	vector<unsigned> indices(nindices);
-	unsigned * idata = indices.data();
-	for (unsigned j = 0; j < h-1; ++j) {
-		unsigned yoffset = j*w;
-		for (unsigned i = 0; i < w-1; ++i) {
-			unsigned n = i + yoffset;
-			*(idata++) = n;      // triangle 1
-			*(idata++) = n+1;
-			*(idata++) = n+1+w;
-			*(idata++) = n+1+w;  // triangle 2
-			*(idata++) = n+w;
-			*(idata++) = n;
-		}
-	}
-
-	return {verts, indices};
-}
-
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
-	constexpr unsigned quad_w = 2,
-		quad_h = 2;
-
-	// auto [vertices, indices] = make_quad(quad_w, quad_h);
-	vector<float> const vertices = {
+	vector<float> const vertices = {  // simple triangle
 		0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
 		1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
-		1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
-		// 0.0f, 1.0f, 0.0f,  0.0f, 1.0f,
+		1.0f, 1.0f, 0.0f,  1.0f, 1.0f
 	};
 
 	vector<unsigned> const indices = {
-		0, 1, 2//, 2, 3, 0
+		0, 1, 2
 	};
 
 	GLuint vao = 0;
