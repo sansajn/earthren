@@ -18,3 +18,8 @@ Exception: Python bindings of GDAL 3.9.0 require at least libgdal 3.9.0, but 3.4
 
 on current *Ubuntu 22.04 LTS*.
 
+Or without miniconda setup, install following
+
+```bash
+sudo apt install python3-gdal python3-matplotlib python3-xarray python3-rioxarray
+```
