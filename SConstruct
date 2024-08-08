@@ -8,18 +8,25 @@ AddOption('--build-debug', action='store_true', dest='build_debug', default=Fals
 def build():
 	cpp20_env = Environment(
 	   CXXFLAGS=['-std=c++20'], CCFLAGS=['-Wall', '-Wextra'],
-		LIBS = ['tiffxx', 'boost_filesystem'])
+		LIBS = [
+			'boost_stacktrace_backtrace', 'dl', 'backtrace',  # to suport stack trace
+			'tiffxx', 'boost_filesystem'],
+		CPPDEFINES=[
+			'BOOST_STACKTRACE_USE_BACKTRACE',  # requires 'boost_stacktrace_backtrace', 'dl' and 'backtrace'
+		])
 
 	if GetOption('build_debug'):
-		cpp20_env.Append(CCFLAGS=['-g', '-O0', '-D_DEBUG'])
+		cpp20_env.Append(CCFLAGS=['-ggdb3', '-O0', '-D_DEBUG'])
+	#else:  # release
+	#	cpp20_env.Append(CCFLAGS=['-O2', '-DNDEBUG'])
 
 	# for OpenGL samples
 
 	# List of pkg-config based library dependencies as (library, version) pair or just package name as string (e.g. ('libzmq', '>= 4.3.0') pair or 'libzmq' string). Library package version can be found by running `pkg-config --modversion LIBRARY` command.
 	deps = [
 		('fmt', '>= 8.1.1'),
-		('glm', '>= 0.9.9.5'),
-		('sdl2', '>= 2.0.20'),
+		('glm', '>= 0.9.9.5'), # libglm-dev
+		('sdl2', '>= 2.0.20'), # libsdl2-dev
 		('glesv2', '>= 3.2'),
 		('Magick++', '>= 6.9.11'),
 		('libtiff-4', '>= 4.3.0'),

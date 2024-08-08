@@ -2,6 +2,9 @@
 Bunch of earth rendering and samples to create a program capable to render earth surface based on satelite data.
 
 # How to build
+
+> **note**: We expect *Ubuntu 22.04 LTS* as operating system.
+
 Install dependencies with
 ```bash
 sudo apt install libtiff-dev libmagick++-dev libtiff-dev

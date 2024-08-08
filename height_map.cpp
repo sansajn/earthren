@@ -1,4 +1,5 @@
 /* OpenGL ES 3.2, terrain with heights from height map texture
+Usage: height_map [DEM_FILE]
 o: show/hide outline
 n: show/hide normals
 l: show hide light direction
@@ -21,8 +22,11 @@ i: print transformations info */
 #include <utility>
 #include <cassert>
 #include <cstddef>
+#include <csignal>
 #include <fmt/core.h>
+#include <boost/stacktrace.hpp>
 #include <boost/filesystem/string_file.hpp>
+#include <string.h>  // for posix strsignal()
 #include <SDL.h>
 #include <GLES3/gl32.h>
 #include <glm/matrix.hpp>
@@ -97,6 +101,15 @@ pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h);
 tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file);
 tuple<unique_ptr<byte>, size_t, size_t> load_png16(path const & png_file);
 
+void verbose_signal_handler(int signal) {
+	cout << "signal '" << strsignal(signal) << "' (" << signal << ") caught\n"
+		<< "stacktrace:\n"
+		<< boost::stacktrace::stacktrace{} 
+		<< endl;
+
+	exit(signal);
+}
+
 constexpr float pi = glm::pi<float>();
 
 struct input_mode {  // list of active input contol modes
@@ -144,6 +157,7 @@ void update(free_camera & cam, input_mode const & mode, float dt);
 
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
+	signal(SIGSEGV, verbose_signal_handler);
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
 
 	// process arguments
@@ -768,7 +782,7 @@ tuple<unique_ptr<byte>, size_t, size_t> load_png16(path const & png_file) {
 
 tuple<GLuint, size_t, size_t> create_texture_16b(path const & fname) {
 	auto const [image_data, width, height] = [&fname](){
-		if (fname.extension() == ".tiff")
+		if (fname.extension() == ".tiff" || fname.extension() == ".tif")
 			return load_tiff(fname);
 		else if (fname.extension() == ".png")
 			return load_png16(fname);
