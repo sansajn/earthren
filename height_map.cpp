@@ -98,8 +98,8 @@ glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.da
 \endcoode */
 pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h);
 
-tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file);
-tuple<unique_ptr<byte>, size_t, size_t> load_png16(path const & png_file);
+tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file);  //!< \return (data, width, height)
+tuple<unique_ptr<byte>, size_t, size_t> load_png16(path const & png_file);  //!< \return (data, width, height)
 
 void verbose_signal_handler(int signal) {
 	cout << "signal '" << strsignal(signal) << "' (" << signal << ") caught\n"
@@ -708,10 +708,7 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 	return shader_program;
 }
 
-//! \return (data, width, height)
 tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file) {
-	// TODO: would it be possible to replace this with ImageMagick?
-
 	ifstream fin{tiff_file};
 	assert(fin.is_open());
 
