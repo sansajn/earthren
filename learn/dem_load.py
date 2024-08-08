@@ -11,8 +11,14 @@ def main(args):
 	dem_path = args[1] if len(args) > 1 else default_dem
 
 	# Load the DEM data
-	with rasterio.open(dem_path) as src:
-		dem_data = src.read(1)
+	with rasterio.open(dem_path) as dataset:  # -> DatasetReader
+		# print some basic info
+		print(dataset)
+		print(f'bounds={dataset.bounds}')
+		print(f'bands={dataset.count}')
+		print(f'CRS={dataset.crs}')
+		
+		dem_data = dataset.read(1)  # -> Numpy ndarray or a view on a Numpy ndarray
 
 	# Plot the DEM data
 	plt.figure(figsize=(10, 10))
