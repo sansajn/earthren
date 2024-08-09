@@ -1,0 +1,26 @@
+#!/bin/bash
+# Script takes SRTM DEM file (GeoTiff) and plit it into NxN tiles.
+
+dem_file=${1:-"/home/ja/gis/data/srtm/n49_e013_1arc_v3.tif"}
+
+echo Opening $dem_file file ...
+
+# Run gdalinfo and figure out x_min/max and y_min/max values
+gdalinfo_output=$(gdalinfo $dem_file)
+
+x_min=$(echo "$gdalinfo_output" | awk '/Upper Left/ {gsub(/[(),]/, "", $4); print $4}')
+y_max=$(echo "$gdalinfo_output" | awk '/Upper Left/ {gsub(/[(),]/, "", $5); print $5}')
+x_max=$(echo "$gdalinfo_output" | awk '/Lower Right/ {gsub(/[(),]/, "", $4); print $4}')
+y_min=$(echo "$gdalinfo_output" | awk '/Lower Right/ {gsub(/[(),]/, "", $5); print $5}')
+
+echo "bounds=[($x_min, $y_min), ($x_max, $y_max)]"
+
+# Calculate midpoint
+mid_x=$(echo "($x_min + $x_max) / 2.0" | bc -l)
+mid_y=$(echo "($y_min + $y_max) / 2.0" | bc -l)
+
+echo "mid-point=($mid_x, $mid_y)"
+
+set -x  # enable command tracing
+gdal_translate -projwin $x_min $y_max $mid_x $mid_y $dem_file dem_upper_left_quarter.tif
+set +x # disable command tracing
