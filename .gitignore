@@ -5,6 +5,8 @@ earthren.creator
 earthren.creator.user
 .qtc_clangd/
 
+learn/tiles/
+
 xy_plane
 xy_plane_grid
 xy_plane_panzoom

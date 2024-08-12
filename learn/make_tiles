@@ -1,0 +1,52 @@
+#!/bin/bash
+# Script takes SRTM DEM file (GeoTiff) and plit it into NxN tiles. 
+# Tiles are named as `tile_C_R.tif` where C is column and R row from 
+# top-left DEM file corner.
+# Usage: make_tiles N [DEM_FILE OUTPUT_DIR=tiles]
+
+N=$1
+dem_file=${2:-"/home/ja/gis/data/srtm/n49_e013_1arc_v3.tif"}
+output_dir=${3:-"tiles"}
+
+# create tiles directory
+mkdir -p $output_dir
+
+echo Opening $dem_file file ...
+
+# Run gdalinfo and figure out x_min/max and y_min/max values
+gdalinfo_output=$(gdalinfo $dem_file)
+
+x_min=$(echo "$gdalinfo_output" | awk '/Upper Left/ {gsub(/[(),]/, "", $4); print $4}')
+y_max=$(echo "$gdalinfo_output" | awk '/Upper Left/ {gsub(/[(),]/, "", $5); print $5}')
+x_max=$(echo "$gdalinfo_output" | awk '/Lower Right/ {gsub(/[(),]/, "", $4); print $4}')
+y_min=$(echo "$gdalinfo_output" | awk '/Lower Right/ {gsub(/[(),]/, "", $5); print $5}')
+
+echo "bounds=[($x_min, $y_min), ($x_max, $y_max)]"
+
+# Calculate the width and height of the entire DEM
+width=$(echo "$x_max - $x_min" | bc -l)
+height=$(echo "$y_max - $y_min" | bc -l)
+
+# Calculate the width and height of each tile
+tile_width=$(echo "$width / $N" | bc -l)
+tile_height=$(echo "$height / $N" | bc -l)
+
+# Loop through each grid position to create tiles
+for i in $(seq 0 $(($N - 1))); do  # columns
+	for j in $(seq 0 $(($N - 1))); do  # rows
+		# Calculate the bounding box for the current tile
+		x_start=$(echo "$x_min + $i * $tile_width" | bc -l)
+		y_start=$(echo "$y_max - $j * $tile_height" | bc -l)
+		x_end=$(echo "$x_start + $tile_width" | bc -l)
+		y_end=$(echo "$y_start - $tile_height" | bc -l)
+
+		# Define output file name
+		tile_file="$output_dir/tile_${i}_${j}.tif"
+
+		# Execute gdal_translate with the calculated bounding box
+		#set -x  # Enable command tracing for gdal_translate
+		gdal_translate -projwin $x_start $y_start $x_end $y_end $dem_file $tile_file
+		echo "$tile_file created"
+		#set +x  # Disable command tracing
+    done
+done

@@ -98,8 +98,8 @@ glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.da
 \endcoode */
 pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h);
 
-tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file);
-tuple<unique_ptr<byte>, size_t, size_t> load_png16(path const & png_file);
+tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file);  //!< \return (data, width, height)
+tuple<unique_ptr<byte>, size_t, size_t> load_png16(path const & png_file);  //!< \return (data, width, height)
 
 void verbose_signal_handler(int signal) {
 	cout << "signal '" << strsignal(signal) << "' (" << signal << ") caught\n"
@@ -155,6 +155,10 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 // TODO: maybe we want to also apply mouse movement there (based on app physics)
 void update(free_camera & cam, input_mode const & mode, float dt);
 
+bool is_tiff(path const & fname) {
+	return (fname.extension() == ".tiff") || (fname.extension() == ".tif");
+}
+
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
@@ -162,7 +166,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// process arguments
 	path const height_map_path = (argc > 1) ? path{argv[1]} : HEIGHT_MAP_TEXTURE;
-	bool const real_elevation_data = height_map_path.extension() == ".tiff";
+	bool const real_elevation_data = is_tiff(height_map_path);
 
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
@@ -572,7 +576,7 @@ void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & 
 }
 
 void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
-	input_events & events) {
+	[[maybe_unused]] input_events & events) {
 
 	constexpr float dt = 0.1f;  // TODO: this should be function argument
 	constexpr float angular_speed = 1.0f/100.0f;  // rad/s
@@ -708,10 +712,7 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 	return shader_program;
 }
 
-//! \return (data, width, height)
 tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file) {
-	// TODO: would it be possible to replace this with ImageMagick?
-
 	ifstream fin{tiff_file};
 	assert(fin.is_open());
 
@@ -782,7 +783,7 @@ tuple<unique_ptr<byte>, size_t, size_t> load_png16(path const & png_file) {
 
 tuple<GLuint, size_t, size_t> create_texture_16b(path const & fname) {
 	auto const [image_data, width, height] = [&fname](){
-		if (fname.extension() == ".tiff" || fname.extension() == ".tif")
+		if (is_tiff(fname))
 			return load_tiff(fname);
 		else if (fname.extension() == ".png")
 			return load_png16(fname);
