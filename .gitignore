@@ -6,6 +6,7 @@ earthren.creator.user
 .qtc_clangd/
 
 learn/tiles/
+learn/tiles_utm/
 
 xy_plane
 xy_plane_grid
@@ -24,3 +25,4 @@ sinxy_heights
 normals
 geoms_plane
 gs_triangle_broken
+terrain_quad

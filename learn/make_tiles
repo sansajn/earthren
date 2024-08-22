@@ -27,13 +27,19 @@ echo "bounds=[($x_min, $y_min), ($x_max, $y_max)]"
 width=$(echo "$x_max - $x_min" | bc -l)
 height=$(echo "$y_max - $y_min" | bc -l)
 
-# Calculate the width and height of each tile
+# Calculate the width and height of each tile, we want square tiles
 tile_width=$(echo "$width / $N" | bc -l)
-tile_height=$(echo "$height / $N" | bc -l)
+tile_height=$tile_width
+
+echo "tile=(${tile_width}x${tile_height}) units"
+
+row_count=$(echo "$height / $tile_height" | bc)  # without -l
+
+echo "spliting into ${N}x${row_count} tiles"
 
 # Loop through each grid position to create tiles
 for i in $(seq 0 $(($N - 1))); do  # columns
-	for j in $(seq 0 $(($N - 1))); do  # rows
+	for j in $(seq 0 $(($row_count - 1))); do  # rows
 		# Calculate the bounding box for the current tile
 		x_start=$(echo "$x_min + $i * $tile_width" | bc -l)
 		y_start=$(echo "$y_max - $j * $tile_height" | bc -l)
