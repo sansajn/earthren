@@ -26,3 +26,5 @@ normals
 geoms_plane
 gs_triangle_broken
 terrain_quad
+satellite_map
+texture_storage_tiff

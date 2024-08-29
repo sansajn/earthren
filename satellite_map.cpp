@@ -1,11 +1,12 @@
 /* OpenGL ES 3.2, terrain with heights from height map texture and proper scaling.
 Usage: terrain_quad [DEM_FILE]
 o: show/hide outline
-n: show/hide normals
-l: show hide light direction
 c: reset view
 p: set camera to predefined position (so we can compare render result)
-t: show/hide terain texture
+t: show/hide terain render (to more focus on outline or normals)
+s: show/hide satellite texture
+a: toggle shading calculations
+l: show hide light direction
 f: map/free camera switch, move camera with "wsad" keys
 	w: go forward
 	s: go backward
@@ -34,12 +35,13 @@ i: print transformations info */
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
-#include <tiffio.hxx>
 #include <spdlog/spdlog.h>
 #include "glmprint.hpp"
 #include "camera.h"
 #include "color.hpp"
 #include "free_camera.hpp"
+#include "texture.hpp"
+#include "shader.hpp"
 
 using std::vector, std::string, std::tuple, std::pair, std::byte;
 using std::unique_ptr;
@@ -68,24 +70,15 @@ constexpr float TERRAIN_HEIGHT_SCALE = 10.0;
 constexpr float elevation_pixel_size = 26.063200588611451;  // this is tile dependent, use gdalinfo to figure it out
 
 path const VERTEX_SHADER_FILE = "terrain_quad.vs",
-	FRAGMENT_SHADER_FILE = "terrain_quad.fs",
-	NORMAL_VERTEX_SHADER_FILE = "terrain_quad_normal.vs",
-	NORMAL_GEOMETRY_SHADER_FILE = "normal.gs",
-	NORMAL_FRAGMENT_SHADER_FILE = "colored.fs",
+	FRAGMENT_SHADER_FILE = "satellite_map.fs",
 	LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_GEOMETRY_SHADER_FILE = "to_line.gs",
 	LIGHTDIR_FRAGMENT_SHADER_FILE = "colored.fs",
 	OUTLINE_VERTEX_SHADER_FILE = "height_map_outline.vs",
 	OUTLINE_GEOMETRY_SHADER_FILE = "to_outline.gs",
 	OUTLINE_FRAGMENT_SHADER_FILE = "colored.fs";
-path const HEIGHT_MAP_TEXTURE = "data/tile_1_1.tif";  // Min/Max=148.000,535.000 (NoData Value=-32768) TODO: do we have any NoData?
-
-GLint get_shader_program(char const * vertex_shader_source,
-	char const * fragment_shader_source, char const * geometry_shader_source = nullptr);
-
-/*! Creates 16bit gray OpenGL texture from image \c fname file and returns texture ID.
-\return (TBO, width, height) triplet. */
-tuple<GLuint, size_t, size_t> create_texture_16b(path const & fname);
+path const HEIGHT_MAP_TEXTURE = "data/tile_1_1.tif";  // 16bit GRAY bitmap
+path const SATELLITE_MAP_TEXTURE = "data/tile_1_1_rgb.tif";  // 8bit RGB bitmap
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc);
 
@@ -101,10 +94,6 @@ glBufferData(GL_ARRAY_BUFFER, size(vertices)*sizeof(float), vertices.data(), GL_
 glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
 \endcoode */
 pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h);
-
-/*! Loads striped TIFF file.
-\return (data, width, height) triplet. */
-tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file);
 
 void verbose_signal_handler(int signal) {
 	cout << "signal '" << strsignal(signal) << "' (" << signal << ") caught\n"
@@ -138,9 +127,10 @@ struct input_events {  // TOOD: we want constructor to init all members to false
 
 struct render_features {  // list of selected rendering features
 	bool show_terrain,
-		show_normals,
 		show_lightdir,
-		show_outline;
+		show_outline,
+		show_satellite,
+		calculate_shades;
 };
 
 /*! Process user input.
@@ -160,18 +150,12 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 // TODO: maybe we want to also apply mouse movement there (based on app physics)
 void update(free_camera & cam, input_mode const & mode, float dt);
 
-bool is_tiff(path const & fname) {
-	return (fname.extension() == ".tiff") || (fname.extension() == ".tif");
-}
-
-
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
 
 	// process arguments
 	path const height_map_path = (argc > 1) ? path{argv[1]} : HEIGHT_MAP_TEXTURE;
-	// bool const real_elevation_data = is_tiff(height_map_path);
 
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
@@ -195,40 +179,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	string vertex_shader,
 		fragment_shader;
 	load_string_file(VERTEX_SHADER_FILE.c_str(), vertex_shader);
+
+	/* TODO: in case file do not exists it throws `std::__ios_failure` which is time consuming
+	to debug (It is not clear that file do not exists), we need a wrappeer for that function to
+	speedup development. */
 	load_string_file(FRAGMENT_SHADER_FILE.c_str(), fragment_shader);
 
 	GLuint const shader_program = get_shader_program(vertex_shader.c_str(), fragment_shader.c_str());
 	GLint const position_loc = glGetAttribLocation(shader_program, "position");
 	GLint const local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
 	GLint const heights_loc = glGetUniformLocation(shader_program, "heights");
+	GLint const satellite_map_loc = glGetUniformLocation(shader_program, "satellite_map");
 	GLint const height_map_size_loc = glGetUniformLocation(shader_program, "height_map_size");
 	GLint const height_scale_loc = glGetUniformLocation(shader_program, "height_scale");
 	GLint const eleveation_scale_loc = glGetUniformLocation(shader_program, "elevation_scale");
-
-	// load shader program for visualize normals
-	string normal_vs,
-		normal_gs,
-		normal_fs;
-	load_string_file(NORMAL_VERTEX_SHADER_FILE.c_str(), normal_vs);
-	load_string_file(NORMAL_GEOMETRY_SHADER_FILE.c_str(), normal_gs);
-
-	/* TODO: in case file do not exists it throws `std::__ios_failure` which is time consuming
-	to debug (It is not clear that file do not exists), we need a wrappeer for that function to
-	speedup development. */
-	load_string_file(NORMAL_FRAGMENT_SHADER_FILE.c_str(), normal_fs);
-
-	GLuint const normal_shader_program = get_shader_program(normal_vs.c_str(),
-		normal_fs.c_str(), normal_gs.c_str());
-
-	// TODO: position unused, should I use different VAO in case of new shader program?
-	GLint const normal_position_loc = glGetAttribLocation(normal_shader_program, "position");
-	assert(position_loc == normal_position_loc);  // TODO: this is temporary
-
-	GLint const normal_heights_loc = glGetUniformLocation(normal_shader_program, "heights");
-	GLint const normal_height_map_size_loc = glGetUniformLocation(normal_shader_program, "height_map_size");
-	GLint const normal_height_scale_loc = glGetUniformLocation(normal_shader_program, "height_scale");
-	GLint const normal_local_to_screen_loc = glGetUniformLocation(normal_shader_program, "local_to_screen");
-	GLint const normal_line_color_loc = glGetUniformLocation(normal_shader_program, "fill_color");
+	GLint const use_satellite_map_loc = glGetUniformLocation(shader_program, "use_satellite_map");
+	GLint const use_shading_loc = glGetUniformLocation(shader_program, "use_shading");
 
 	// load shader program to visualize light direction
 	string lightdir_vs,
@@ -275,6 +241,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	auto const [height_map, texture_width, texture_height] = create_texture_16b(height_map_path);
 	assert(texture_width == texture_height);  // we are expecting square elevation tiles
 
+	auto const [satellite_map, satellite_width, satellite_height] = create_texture_8b(SATELLITE_MAP_TEXTURE);
+	assert(satellite_width == satellite_height);  // we are expecting square elevation tiles
+
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
 
@@ -294,9 +263,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	render_features features = {
 		.show_terrain = true,
-		.show_normals = false,
 		.show_lightdir = false,
-		.show_outline = false
+		.show_outline = false,
+		.show_satellite = true,
+		.calculate_shades = true
 	};
 
 	auto t_prev = steady_clock::now();
@@ -362,33 +332,31 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 			// bind height map texture
 			// GLuint const & tile = tiles[0];  // TODO: we do not need list of tiles, just a tile
-			glUniform1i(heights_loc, 0);  // set sampler s to use texture unit 0
+			glUniform1i(heights_loc, 0);  // set height map sampler to use texture unit 0
 			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
+			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
+
+			if (features.show_satellite) {
+				glUniform1i(use_satellite_map_loc, 1);  // set use_satellite_map to true
+				glUniform1i(satellite_map_loc, 1);  // set satellite map sampler to use testure unit 1
+				glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
+				glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
+			}
+			else {
+				glUniform1i(use_satellite_map_loc, 0);  // just set use_satellite_map to false
+			}
+
+			if (features.calculate_shades) {
+				glUniform1i(use_shading_loc, 1);  // just set use_shading to true
+			}
+			else
+				glUniform1i(use_shading_loc, 0);  // just set use_shading to false
 
 			glUniform2f(height_map_size_loc, texture_width, texture_height);
 			glUniform1f(height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
 			glUniform1f(eleveation_scale_loc, elevation_scale);  // TODO: can we set uniform before we use a program?
 
 			glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
-
-			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-		}
-
-		// render normals
-		if (features.show_normals) {
-			glUseProgram(normal_shader_program);
-
-			glUniform3fv(normal_line_color_loc, 1, value_ptr(rgb::lime));
-
-			// bind height map texture
-			glUniform1i(normal_heights_loc, 0);  // set sampler s to use texture unit 0
-			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
-
-			glUniform2f(normal_height_map_size_loc, texture_width, texture_height);
-			glUniform1f(normal_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
-			glUniformMatrix4fv(normal_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 		}
@@ -453,10 +421,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 void input_render_features(SDL_Event const & event, render_features & features) {
 	if (event.type == SDL_KEYDOWN) {
 		switch (event.key.keysym.sym) {
-		case SDLK_n:
-			features.show_normals = !features.show_normals;
-			spdlog::info("show_normals={}", features.show_normals);
-			break;
 		case SDLK_l:
 			features.show_lightdir = !features.show_lightdir;
 			spdlog::info("show_lightdir={}", features.show_lightdir);
@@ -468,6 +432,14 @@ void input_render_features(SDL_Event const & event, render_features & features) 
 		case SDLK_t:
 			features.show_terrain = !features.show_terrain;
 			spdlog::info("show_terrain={}", features.show_terrain);
+			break;
+		case SDLK_s:
+			features.show_satellite = !features.show_satellite;
+			spdlog::info("show_satellite={}", features.show_satellite);
+			break;
+		case SDLK_a:
+			features.calculate_shades = !features.calculate_shades;
+			spdlog::info("calculate_shadess={}", features.calculate_shades);
 			break;
 		}
 	}
@@ -663,150 +635,6 @@ void update(free_camera & cam, input_mode const & mode, float dt) {
 	cam.update();  // update camera
 }
 
-// TODO: rewrite to string_view, glShaderSource call needs to be changed
-GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source, char const * geometry_shader_source) {
-	enum Consts {INFOLOG_LEN = 512};
-	GLchar infoLog[INFOLOG_LEN];
-	GLint success;
-
-	/* Vertex shader */
-	GLint vertex_shader;
-	vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
-	glCompileShader(vertex_shader);
-	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		// TODO: we do not have file names so can't provide
-		glGetShaderInfoLog(vertex_shader, INFOLOG_LEN, NULL, infoLog);
-		cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-			  << infoLog << endl;
-	}
-
-	/* Fragment shader */
-	GLint fragment_shader;
-	fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
-	glCompileShader(fragment_shader);
-	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(fragment_shader, INFOLOG_LEN, NULL, infoLog);
-		cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
-			  << infoLog << endl;
-	}
-
-	// geometry shader
-	GLint geometry_shader = -1;
-	if (geometry_shader_source) {
-		geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
-		glShaderSource(geometry_shader, 1, &geometry_shader_source, nullptr);
-		glCompileShader(geometry_shader);
-		glGetShaderiv(geometry_shader, GL_COMPILE_STATUS, &success);
-		if (!success) {
-			glGetShaderInfoLog(geometry_shader, INFOLOG_LEN, NULL, infoLog);
-			cout << "ERROR::SHADER::GEOMETRY::COMPILATION_FAILED\n"
-				  << infoLog << endl;
-		}
-	}
-
-	/* Link shaders */
-	GLint shader_program;
-	shader_program = glCreateProgram();
-	glAttachShader(shader_program, vertex_shader);
-	glAttachShader(shader_program, fragment_shader);
-	if (geometry_shader_source)
-		glAttachShader(shader_program, geometry_shader);
-
-	glLinkProgram(shader_program);
-	glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetProgramInfoLog(shader_program, INFOLOG_LEN, NULL, infoLog);
-		cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
-			  << infoLog << endl;
-	}
-
-	glDeleteShader(vertex_shader);
-	glDeleteShader(fragment_shader);
-	return shader_program;
-}
-
-tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file) {
-	ifstream fin{tiff_file};
-	assert(fin.is_open());
-
-	TIFF * tiff = TIFFStreamOpen("memory", &fin);
-	assert(tiff);
-
-	// image w, h
-	uint32_t image_w = 0,
-		image_h = 0;
-	TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_w);
-	TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_h);
-
-	// strip related stuff
-	tstrip_t const strip_count = TIFFNumberOfStrips(tiff);
-	tmsize_t const strip_size = TIFFStripSize(tiff);
-
-	uint32_t rows_per_strip = 0;
-	TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &rows_per_strip);
-
-	uint16_t bits_per_sample = 0;
-	TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
-
-	uint16_t sample_format = 0;
-	TIFFGetField(tiff, TIFFTAG_SAMPLEFORMAT, &sample_format);
-	// TODO: we expect SAMPLEFORMAT_UINT (2)
-
-	uint16_t samples_per_pixel = 0;
-	TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);
-	// TODO: we expect 1
-
-	// read strip by strip and store it into whole image
-	unsigned const image_size = image_w*image_h*sample_format;
-	unique_ptr<byte> image_data{new byte[image_size]};
-	memset(image_data.get(), 0xff, image_size);
-	for (tstrip_t strip = 0; strip < strip_count; ++strip) {
-		unsigned offset = strip*(strip_size/2);
-		uint16_t * buf = reinterpret_cast<uint16_t *>(image_data.get()) + offset;
-		// cout << "buf=" << std::hex << uint64_t(buf) << ", offset=" << offset << '\n';
-		tmsize_t ret = TIFFReadEncodedStrip(tiff, strip, buf, (tsize_t)-1);
-		assert(ret != -1 && ret > 0);
-	}
-
-	TIFFClose(tiff);
-	fin.close();
-
-	return {std::move(image_data), (size_t)image_w, (size_t)image_h};
-}
-
-tuple<GLuint, size_t, size_t> create_texture_16b(path const & fname) {
-	auto const [image_data, width, height] = [&fname](){
-		if (is_tiff(fname))
-			return load_tiff(fname);
-		else
-			throw std::runtime_error("unsupported heightt map image format (only TIFF (*.tiff), and PNG (*.png) suported");
-	}();
-
-	spdlog::info("{} ({}x{}) image loaded", fname.c_str(), width, height);
-
-	GLuint tbo;
-	glGenTextures(1, &tbo);
-	glBindTexture(GL_TEXTURE_2D, tbo);
-
-	// note: 16bit I/UI textures can not be interpolated and so filter needs to be set to GL_NEAREST
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);  // or GL_NEAREST
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// clam to the edge outside of [0,1]^2 range
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16UI, width, height);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RED_INTEGER, GL_UNSIGNED_SHORT, image_data.get());
-	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
-
-	return {tbo, width, height};
-}
-
 pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
 	assert(w > 1 && h > 1 && "invalid dimensions");
 
@@ -828,7 +656,7 @@ pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
 		}
 	}
 
-			 // indices
+	// indices
 	unsigned const nindices = 2*(w-1)*(h-1)*3;
 	vector<unsigned> indices(nindices);
 	unsigned * idata = indices.data();

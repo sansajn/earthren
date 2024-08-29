@@ -10,7 +10,7 @@ out vec2 st;  // normal texture coordinate in pixels [0, S_normal_size]^2
 uniform mat4 local_to_screen;
 uniform usampler2D heights;  // 16bit UI height texture (see heightMapSize for dimensions)
 uniform float elevation_scale;  // terrain elevation scale factor 
-uniform float height_scale;  // e.g. 1 for PNG files or 100 for TIFF (elevation) files
+uniform float height_scale;  // e.g. 10.0
 
 const float normal_tile_size = 712.0;  // the value is calculated as elevation_tile_size-4 (where 4 are for 2px border for each side)
 

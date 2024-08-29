@@ -1,3 +1,9 @@
+`tile_1_1_rgb.tif`: Generated from `LC08_L1TP_192025_20240513_20240520_02_T1` tile by
+- merging red, green and blue bands together, then
+- Plzen area was cropped out of the whole tile and then
+- tile histogram was stretched and tile converted to 8bit depth.
+see [[Earthren#merge b2, b3 and b4 to obtain color picture and clip Plzen area]] for more details.
+
 `dem.tif`: downloaded by QGis via *OpenTopography DEM Downloader* plugin for an area defined by a shapefile generated with `learn/bbox_shapefile.py` script. The bounding box covers tiles from `tiles` directory calculated by `learn/bbox_calc.py` script. Source for height map is SRTM 30m service.
 
 Some more information about `dem.tiff`

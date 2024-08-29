@@ -55,3 +55,11 @@ to_normal.gs
 gs_triangle_broken.cpp
 gs_triangle_broken.vs
 gs_triangle_broken.gs
+
+satellite_map.cpp
+tiff.hpp
+tiff.cpp
+texture.hpp
+texture.cpp
+shader.hpp
+shader.cpp

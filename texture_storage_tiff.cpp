@@ -3,14 +3,20 @@
 #include <tuple>
 #include <cassert>
 #include <iostream>
+#include <memory>
+#include <filesystem>
+#include <fstream>
 #include <SDL.h>
 #include <GLES3/gl32.h>
-#include <Magick++.h>
+#include <tiffio.hxx>
 
 using std::cout, std::endl;
-using std::tuple;
+using std::byte;
+using std::tuple, std::unique_ptr, std::move;
+using std::filesystem::path;
+using std::ifstream;
 
-std::string const texture_path = "lena.jpg";
+std::string const texture_path = "data/output_cropped_stretched.tif";  // TODO: hardcoded
 
 constexpr GLuint WIDTH = 800,
 	HEIGHT = 600;
@@ -31,17 +37,27 @@ uniform sampler2D s;
 in vec2 st;
 out vec4 frag_color;
 void main() {
-	frag_color = texture(s, st);
+	frag_color = vec4(texture(s, st).rgb, 1.0);
 })";
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_mesh();
 
 //! Creates OpenGL texture from image \c fname file and returns texture ID.
-GLuint create_texture(std::string const & fname);
+GLuint create_texture_tiff_rgb8(std::string const & fname);
+
+struct tiff_data_desc {
+	size_t width, 
+		height;
+	uint8_t bytes_per_sample, 
+		samples_per_pixel;
+};
+
+tuple<unique_ptr<byte>, tiff_data_desc> load_tiff(path const & tiff_file);
+
 
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source);
 
-int main(int argc, char * argv[]) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
@@ -63,7 +79,7 @@ int main(int argc, char * argv[]) {
 	glViewport(0, 0, WIDTH, HEIGHT);
 
 	auto [vao, vbo, ibo, index_count] = create_mesh();
-	GLuint tbo = create_texture(texture_path);
+	GLuint tbo = create_texture_tiff_rgb8(texture_path);
 
 	// rendering ...
 	glUseProgram(shader_program);
@@ -103,21 +119,84 @@ int main(int argc, char * argv[]) {
 	return 0;
 }
 
-GLuint create_texture(std::string const & fname) {
-	Magick::Image im{fname};
-	im.flip();
-	Magick::Blob imblob;
-	im.write(&imblob, "RGBA");  // load image as rgba array
+GLuint create_texture_tiff_rgb8(std::string const & fname) {
+	auto [pixels, desc] = load_tiff(fname);
+	// TODO: we need to flip image
+	assert(desc.bytes_per_sample == 1); // 8bit
+	assert(desc.samples_per_pixel == 3); // RGB
+
+	// To load RGB images charbot says that image rows must be aligned by 4 (which is not the case of our pixel data).
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	GLuint tbo;
 	glGenTextures(1, &tbo);
 	glBindTexture(GL_TEXTURE_2D, tbo);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, desc.width, desc.height);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, desc.width, desc.height, GL_RGB, GL_UNSIGNED_BYTE, pixels.get());
+	
+	// TODO: automitic conversion to avoid changing alignment to 1 doesn't seems to working
+	// glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, desc.width, desc.height);
+	// glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, desc.width, desc.height, GL_RGB, GL_UNSIGNED_BYTE, pixels.get());
+	
 	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
 
 	return tbo;
 }
+
+tuple<unique_ptr<byte>, tiff_data_desc> load_tiff(path const & tiff_file) {
+	ifstream fin{tiff_file};
+	assert(fin.is_open());
+
+	TIFF * tiff = TIFFStreamOpen("memory", &fin);
+	assert(tiff);
+
+	// image w, h
+	uint32_t image_w = 0,
+		image_h = 0;
+	TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_w);
+	TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_h);
+
+	// strip related stuff
+	tstrip_t const strip_count = TIFFNumberOfStrips(tiff);
+	tmsize_t const strip_size = TIFFStripSize(tiff);
+
+	uint32_t rows_per_strip = 0;
+	TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &rows_per_strip);
+
+	uint16_t bits_per_sample = 0;
+	TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
+
+	uint16_t sample_format = 0;
+	TIFFGetField(tiff, TIFFTAG_SAMPLEFORMAT, &sample_format);
+	assert(sample_format == SAMPLEFORMAT_UINT || sample_format == SAMPLEFORMAT_INT);
+
+	uint16_t samples_per_pixel = 0;
+	TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);
+	assert(samples_per_pixel == 1 || samples_per_pixel == 3);  // expect GRAY or RGB images
+
+	// read strip by strip and store it into whole image
+	unsigned const image_size = image_w*image_h*(bits_per_sample/8)*samples_per_pixel;
+	unique_ptr<byte> image_data{new byte[image_size]};
+	memset(image_data.get(), 0xff, image_size);   // clear buffer
+	for (tstrip_t strip = 0; strip < strip_count; ++strip) {
+		unsigned const offset = strip*strip_size;
+		uint8_t * buf = reinterpret_cast<uint8_t *>(image_data.get()) + offset;
+		tmsize_t ret = TIFFReadEncodedStrip(tiff, strip, buf, (tsize_t)-1);
+		assert(ret != -1 && ret > 0);
+	}
+
+	TIFFClose(tiff);
+	fin.close();
+
+	tiff_data_desc const desc = {
+		.width=image_w,
+		.height=image_h,
+		.bytes_per_sample=bits_per_sample/8,  // TODO: deal with warning there
+		.samples_per_pixel=samples_per_pixel};  
+
+	return {std::move(image_data), desc};
+}
+
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_mesh() {
 	constexpr GLfloat vertices[] = {

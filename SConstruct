@@ -29,8 +29,9 @@ def build():
 		('sdl2', '>= 2.0.20'), # libsdl2-dev
 		('glesv2', '>= 3.2'),
 		('Magick++', '>= 6.9.11'),
-		('libtiff-4', '>= 4.3.0'),
+		('libtiff-4', '>= 4.3.0'),  # libtiff-dev
 		('spdlog', '>= 1.9.2')  # libspdlog-dev
+		# Boost.GIL
 	]
 
 	env = cpp20_env.Clone()
@@ -40,6 +41,7 @@ def build():
 	env.Program(['xy_plane_panzoom.cpp'])
 	env.Program(['xy_plane_grid.cpp'])
 	env.Program(['texture_storage.cpp'])
+	env.Program(['texture_storage_tiff.cpp'])
 	env.Program(['xy_plane_texture.cpp'])
 	env.Program(['xy_plane_grid_textured.cpp'])
 	env.Program(['map_camera.cpp'])
@@ -54,6 +56,7 @@ def build():
 	env.Program(['geoms_plane.cpp', 'camera.cpp'])
 	env.Program(['gs_triangle_broken.cpp', 'camera.cpp', 'free_camera.cpp'])
 	env.Program(['terrain_quad.cpp', 'camera.cpp', 'free_camera.cpp'])
+	env.Program(['satellite_map.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp', 'tiff.cpp'])
 
 def configure(env, dependency_list):
 	conf = env.Configure(
