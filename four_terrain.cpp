@@ -45,6 +45,7 @@ i: print transformations info */
 #include "texture.hpp"
 #include "shader.hpp"
 #include "io.hpp"
+#include "flat_shader.hpp"
 
 using std::vector, std::string, std::tuple, std::pair, std::byte;
 using std::unique_ptr;
@@ -243,6 +244,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLint const outline_height_scale_loc = glGetUniformLocation(outline_shader_program, "height_scale");
 	GLint const outline_local_to_screen_loc = glGetUniformLocation(outline_shader_program, "local_to_screen");
 	GLint const outline_line_color_loc = glGetUniformLocation(outline_shader_program, "fill_color");
+
+	string const flat_vs = read_file("flat_shader.vs"),
+		flat_fs = read_file("flat_shader.fs");
+	GLint const flat_shader_program_id = get_shader_program(flat_vs.c_str(), flat_fs.c_str());
+
+	flat_shader flat_prog{flat_shader_program_id};  // TODO: rename flat_shader_program flat_shader{flat_shader_program_id};
 
 	// load texture
 	// vector<GLuint> tiles = read_tiles();  // TODO: we only need first tile
