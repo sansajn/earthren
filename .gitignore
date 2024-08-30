@@ -1,4 +1,5 @@
 *.o
+*.a
 config.log
 .sconsign.dblite
 earthren.creator
@@ -28,3 +29,5 @@ gs_triangle_broken
 terrain_quad
 satellite_map
 texture_storage_tiff
+height_scale
+height_scale.ini

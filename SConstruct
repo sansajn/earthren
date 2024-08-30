@@ -13,7 +13,8 @@ def build():
 			'tiffxx', 'boost_filesystem'],
 		CPPDEFINES=[
 			'BOOST_STACKTRACE_USE_BACKTRACE',  # requires 'boost_stacktrace_backtrace', 'dl' and 'backtrace'
-		])
+			'IMGUI_IMPL_OPENGL_ES3'],  # ImGUI OpenGL ES3 backand
+		CPPPATH=['.', 'imgui/', 'imgui/examples/'])
 
 	if GetOption('build_debug'):
 		cpp20_env.Append(CCFLAGS=['-ggdb3', '-O0', '-D_DEBUG'])
@@ -30,7 +31,8 @@ def build():
 		('glesv2', '>= 3.2'),
 		('Magick++', '>= 6.9.11'),
 		('libtiff-4', '>= 4.3.0'),  # libtiff-dev
-		('spdlog', '>= 1.9.2')  # libspdlog-dev
+		('spdlog', '>= 1.9.2'),  # libspdlog-dev
+		('fmt', '>= 6.1.2')  # libfmt-dev
 		# Boost.GIL
 	]
 
@@ -57,6 +59,16 @@ def build():
 	env.Program(['gs_triangle_broken.cpp', 'camera.cpp', 'free_camera.cpp'])
 	env.Program(['terrain_quad.cpp', 'camera.cpp', 'free_camera.cpp'])
 	env.Program(['satellite_map.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp', 'tiff.cpp'])
+
+	# height_scale	sample
+	imgui = env.StaticLibrary([
+		Glob('imgui/*.cpp'),
+		'imgui/examples/imgui_impl_sdl.cpp',  # TODO: maybe we do not need this backend for SDL
+		'imgui/examples/imgui_impl_opengl3.cpp',  # backend for opengl es3
+	])
+
+	env.Program(['height_scale.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp',
+		'tiff.cpp', 'io.cpp',  imgui])
 
 def configure(env, dependency_list):
 	conf = env.Configure(
