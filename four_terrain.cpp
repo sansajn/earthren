@@ -82,7 +82,7 @@ path const VERTEX_SHADER_FILE = "terrain_quad.vs",
 path const HEIGHT_MAP_TEXTURE = "data/tile_1_1.tif";  // 16bit GRAY bitmap
 path const SATELLITE_MAP_TEXTURE = "data/tile_1_1_rgb.tif";  // 8bit RGB bitmap
 
-constexpr char const * config_file_name = "height_scale.ini";
+constexpr char const * config_file_name = "four_terrain.ini";
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc);
 

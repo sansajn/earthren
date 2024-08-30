@@ -73,7 +73,7 @@ def build():
 	env.Program(['height_scale.cpp', height_scale_common, imgui])
 
 	# four terrain sample
-	env.Program(['four_terrain.cpp', height_scale_common, imgui])
+	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp', imgui])
 
 
 def configure(env, dependency_list):

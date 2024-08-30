@@ -5,6 +5,13 @@ camera.h
 color.hpp
 colored.fs
 colors.glsl
+earthren.cxxflags
+earthren.files
+earthren.includes
+flat_shader.cpp
+flat_shader.fs
+flat_shader.hpp
+flat_shader.vs
 four_terrain.cpp
 free_camera.cpp
 free_camera.hpp
