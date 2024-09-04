@@ -13,6 +13,7 @@ flat_shader.fs
 flat_shader.hpp
 flat_shader.vs
 four_terrain.cpp
+four_terrain.vs
 free_camera.cpp
 free_camera.hpp
 geoms_plane.cpp

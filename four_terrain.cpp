@@ -54,9 +54,8 @@ using std::cout, std::endl;
 using fmt::print;
 using std::chrono::steady_clock, std::chrono::duration_cast, 
 	std::chrono::milliseconds;
-using glm::mat4,
+using glm::mat4, glm::mat3,
 	glm::vec4, glm::vec3, glm::vec2,
-	glm::mat3,
 	glm::value_ptr,
 	glm::perspective,
 	glm::translate,
@@ -72,7 +71,7 @@ constexpr float TERRAIN_SIZE_SCALE = 2.0f;
 constexpr float TERRAIN_HEIGHT_SCALE = 10.0f;
 constexpr float elevation_pixel_size = 26.063200588611451;  // this is tile dependent, use gdalinfo to figure it out
 
-path const VERTEX_SHADER_FILE = "terrain_quad.vs",
+path const VERTEX_SHADER_FILE = "four_terrain.vs",
 	FRAGMENT_SHADER_FILE = "satellite_map.fs",
 	LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_GEOMETRY_SHADER_FILE = "to_line.gs",
@@ -154,6 +153,65 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 
 // TODO: maybe we want to also apply mouse movement there (based on app physics)
 void update(free_camera & cam, input_mode const & mode, float dt);
+
+// three lines
+constexpr float axis_verts[] = {
+	0,0,0, 1,0,0,  // x
+	0,0,0, 0,1,0,  // y
+	0,0,0, 0,0,1  // z
+};
+
+class axes_model {
+ public:
+	axes_model(GLuint axes_vbo);
+	void draw(flat_shader & program, mat4 const & local_to_screen);
+
+ private:
+	GLuint _axes_vbo;
+};
+
+axes_model::axes_model(GLuint axes_vbo)
+	: _axes_vbo{axes_vbo}
+{}
+
+void axes_model::draw(flat_shader & program, mat4 const & local_to_screen) {
+	// TODO: we want VAO there
+
+	program.local_to_screen(local_to_screen);
+
+	GLint const position_loc = program.position_location();
+
+	glEnableVertexAttribArray(position_loc);
+	glBindBuffer(GL_ARRAY_BUFFER, _axes_vbo);
+
+	// x
+	program.color(vec3{1,0,0});
+	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+	glDrawArrays(GL_LINES, 0, 2);
+
+	// y
+	program.color(vec3{0,1,0});
+	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+	glDrawArrays(GL_LINES, 2, 2);
+
+	// z
+	program.color(vec3{0,0,1});
+	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+	glDrawArrays(GL_LINES, 4, 2);
+}
+
+GLuint push_data(void const * data, size_t size_in_bytes) {
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, size_in_bytes, data, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbind
+	return vbo;
+}
+
+GLuint push_axes() {
+	return push_data(axis_verts, sizeof(axis_verts));
+}
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
@@ -250,6 +308,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLint const flat_shader_program_id = get_shader_program(flat_vs.c_str(), flat_fs.c_str());
 
 	flat_shader flat_prog{flat_shader_program_id};  // TODO: rename flat_shader_program flat_shader{flat_shader_program_id};
+
+	// load axes model
+	GLuint const axes_position_vbo = push_axes();
+	axes_model axes{axes_position_vbo};
 
 	// load texture
 	// vector<GLuint> tiles = read_tiles();  // TODO: we only need first tile
@@ -429,6 +491,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		}
 
 		glBindVertexArray(0);  // unbind VAO
+
+		// TODO: render axis there
+		flat_prog.use();
+
+		mat4 const M_axes = translate(mat4{1}, vec3{0,0,0}),  // put axis into the middle
+			axes_local_to_screen = P*V*M_axes;
+
+		axes.draw(flat_prog, axes_local_to_screen);
 
 		ImGui::Render();  // render ImGui
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -725,6 +795,8 @@ pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
 	return {verts, indices};
 }
 
+// TODO: rename to push_quad_mesh()
+// TODO: the funciton is not working ina case we want to render witha different shaader program, because losition_loc can cenge there
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	constexpr unsigned quad_w = 100,
 		quad_h = 100;
@@ -739,11 +811,13 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, size(vertices)*sizeof(float), vertices.data(), GL_STATIC_DRAW);
+	// TODO: we can use push_data() there
 
 	GLuint ibo = 0;  // create index bufffer object
 	glGenBuffers(1, &ibo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
+	// TODO: we need push_element_data() there
 
 	// bind (x,y,z) data
 	constexpr size_t stride = (3+2)*sizeof(float);
