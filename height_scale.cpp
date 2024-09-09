@@ -39,7 +39,7 @@ i: print transformations info */
 #include "imgui/examples/imgui_impl_sdl.h"
 #include "imgui/examples/imgui_impl_opengl3.h"
 #include "glmprint.hpp"
-#include "camera.h"
+#include "camera.hpp"
 #include "color.hpp"
 #include "free_camera.hpp"
 #include "texture.hpp"

@@ -37,7 +37,7 @@ i: print transformations info */
 #include <tiffio.hxx>
 #include <spdlog/spdlog.h>
 #include "glmprint.hpp"
-#include "camera.h"
+#include "camera.hpp"
 #include "color.hpp"
 #include "free_camera.hpp"
 

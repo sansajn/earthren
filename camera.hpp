@@ -11,6 +11,7 @@ struct map_camera {
 
 	explicit map_camera(float d = 1.0f);
 	glm::mat4 const & view() const {return _view;}
+	glm::vec3 forward() const;  //!< gets camera forward direction
 
 	void update();
 

@@ -39,7 +39,7 @@ i: print transformations info */
 #include "imgui/examples/imgui_impl_sdl.h"
 #include "imgui/examples/imgui_impl_opengl3.h"
 #include "glmprint.hpp"
-#include "camera.h"
+#include "camera.hpp"
 #include "color.hpp"
 #include "free_camera.hpp"
 #include "texture.hpp"
@@ -495,8 +495,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		// TODO: render axis there
 		flat_prog.use();
 
-		mat4 const M_axes = translate(mat4{1}, vec3{0,0,0}),  // put axis into the middle
-			axes_local_to_screen = P*V*M_axes;
+		// TODO: we want to put axess not in the center, but into the left bottom corner in a camera space (so the positoin never change, just the rotation)
+		// mat4 const M_axes = translate(mat4{1}, vec3{0,0,0}),  // put axis into the middle
+		// 	axes_local_to_screen = P*V*M_axes;
+
+		mat4 const cam_rot = mat4{glm::mat3{V}};
+
+		// T*S*R
+		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25,-2.45,-5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
+			axes_local_to_screen = P*M_axes*cam_rot;  //=P*V*V'*M_axes
 
 		axes.draw(flat_prog, axes_local_to_screen);
 
