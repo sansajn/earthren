@@ -1,7 +1,7 @@
 
 SConstruct
 camera.cpp
-camera.h
+camera.hpp
 color.hpp
 colored.fs
 colors.glsl

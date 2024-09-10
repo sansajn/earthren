@@ -328,13 +328,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
 	for (size_t row = 0; row < grid_rows; ++row) {
 		for (size_t col = 0; col < grid_cols; ++col) {
-			auto const height_tile = create_texture_16b(height_map_path);
+			// TODO: generate tile names
+			string const height_tile_name = fmt::format("tile_{}_{}.tif", col+1, row+1);  // we starts with tile_1_1.tif file
+
+			auto const height_tile = create_texture_16b(height_tile_name);
 			assert(is_square(height_tile)); // height_width == height_height
 			tiles.push_back(height_tile);
 			// auto const [height_map, texture_width, texture_height] = create_texture_16b(height_map_path);
 			// assert(texture_width == texture_height);  // we are expecting square elevation tiles
 
-			auto const satellite_tile = create_texture_8b(SATELLITE_MAP_TEXTURE);
+			string const satellite_tile_name = fmt::format("tile_{}_{}_rgb.tif", col+1, row+1);
+
+			auto const satellite_tile = create_texture_8b(satellite_tile_name);
 			assert(is_square(satellite_tile));
 			tiles.push_back(satellite_tile);
 			// auto const [satellite_map, satellite_width, satellite_height] = create_texture_8b(SATELLITE_MAP_TEXTURE);
