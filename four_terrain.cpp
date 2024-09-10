@@ -47,7 +47,8 @@ i: print transformations info */
 #include "io.hpp"
 #include "flat_shader.hpp"
 
-using std::vector, std::string, std::tuple, std::pair, std::byte;
+using std::vector, std::string, std::pair, std::byte;
+using std::tuple, std::get;
 using std::unique_ptr;
 using std::filesystem::path, std::ifstream;
 using std::cout, std::endl;
@@ -153,6 +154,11 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 
 // TODO: maybe we want to also apply mouse movement there (based on app physics)
 void update(free_camera & cam, input_mode const & mode, float dt);
+
+bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
+	return get<1>(tile) == get<2>(tile);
+}
+
 
 // three lines
 constexpr float axis_verts[] = {
@@ -313,13 +319,30 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLuint const axes_position_vbo = push_axes();
 	axes_model axes{axes_position_vbo};
 
+	// TODO: we want to read all four textures there
 	// load texture
-	// vector<GLuint> tiles = read_tiles();  // TODO: we only need first tile
-	auto const [height_map, texture_width, texture_height] = create_texture_16b(height_map_path);
-	assert(texture_width == texture_height);  // we are expecting square elevation tiles
+	constexpr size_t grid_rows = 2,
+		grid_cols = 2;
+	assert((grid_rows % 2) == 0 && (grid_cols % 2) == 0);
 
-	auto const [satellite_map, satellite_width, satellite_height] = create_texture_8b(SATELLITE_MAP_TEXTURE);
-	assert(satellite_width == satellite_height);  // we are expecting square elevation tiles
+	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
+	for (size_t row = 0; row < grid_rows; ++row) {
+		for (size_t col = 0; col < grid_cols; ++col) {
+			auto const height_tile = create_texture_16b(height_map_path);
+			assert(is_square(height_tile)); // height_width == height_height
+			tiles.push_back(height_tile);
+			// auto const [height_map, texture_width, texture_height] = create_texture_16b(height_map_path);
+			// assert(texture_width == texture_height);  // we are expecting square elevation tiles
+
+			auto const satellite_tile = create_texture_8b(SATELLITE_MAP_TEXTURE);
+			assert(is_square(satellite_tile));
+			tiles.push_back(satellite_tile);
+			// auto const [satellite_map, satellite_width, satellite_height] = create_texture_8b(SATELLITE_MAP_TEXTURE);
+			// assert(satellite_width == satellite_height);  // we are expecting square elevation tiles
+		}
+	}
+
+	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
@@ -347,6 +370,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	};
 
 	float height_scale = TERRAIN_HEIGHT_SCALE;
+	float const model_scale = TERRAIN_SIZE_SCALE;
 
 	auto t_prev = steady_clock::now();
 
@@ -403,22 +427,38 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glBindVertexArray(vao);  // VAO is independent of used program
 
-		float const model_scale = TERRAIN_SIZE_SCALE;
-		vec2 const model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
-		mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
-		mat4 const local_to_screen = P*V*M;
+		// float const model_scale = TERRAIN_SIZE_SCALE;
+		// vec2 const model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
+		// mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
+		// mat4 const local_to_screen = P*V*M;
 
-		if (events.info_request) {
-			cout << "info:\n"
-				<< "model_scale=" << model_scale << '\n'
-				<< "model_pos=" << model_pos << '\n'
-				<< with_label{"V", V} << '\n'
-				<< with_label{"local_to_screen", local_to_screen} << '\n'
-				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << '\n';
-		}
+		// if (events.info_request) {
+		// 	cout << "info:\n"
+		// 		<< "model_scale=" << model_scale << '\n'
+		// 		<< "model_pos=" << model_pos << '\n'
+		// 		<< with_label{"V", V} << '\n'
+		// 		<< with_label{"local_to_screen", local_to_screen} << '\n'
+		// 		<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << '\n';
+		// }
 
+		auto const & first_elevation_tile = *begin(tiles);
+		size_t const texture_width = get<1>(first_elevation_tile);
+		size_t const texture_height =  get<2>(first_elevation_tile);
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);
 		
+		// draw tiles
+		for (size_t row = 0; row < grid_rows; ++row) {
+			for (size_t col = 0; col < grid_cols; ++col) {
+
+				size_t const tile_idx = 2 * (row*grid_cols + col);
+				GLuint const height_map = get<0>(tiles[tile_idx]),
+					satellite_map = get<0>(tiles[tile_idx+1]);
+
+				// vec2 const model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
+				vec2 model_pos = quad_size * (vec2{col, row} - vec2(grid_cols, grid_rows)/2.0f) * model_scale;
+				mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
+				mat4 const local_to_screen = P*V*M;
+
 		// render terrain
 		if (features.show_terrain) {
 			glUseProgram(shader_program);
@@ -489,6 +529,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 		}
+
+			}
+		}
+
+
 
 		glBindVertexArray(0);  // unbind VAO
 
