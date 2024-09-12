@@ -416,7 +416,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);
 		
 		// draw tiles
-		for (int row = 0; row < grid_rows; ++row) {
+		for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
 			for (int col = 0; col < grid_cols; ++col) {
 				size_t const tile_idx = 2 * (row*grid_cols + col);
 				GLuint const height_map = get<0>(tiles[tile_idx]),
