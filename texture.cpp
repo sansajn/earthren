@@ -12,7 +12,7 @@ bool is_tiff(path const & fname) {
 tuple<GLuint, size_t, size_t> create_texture_16b(path const & fname) {
 	auto const [image_data, image_desc] = [&fname](){
 		if (is_tiff(fname))
-			return load_tiff_exp(fname, true);
+			return load_tiff_desc(fname, true);
 		else
 			throw std::runtime_error("unsupported texture format (only TIFF (*.tif) suported");
 	}();
@@ -54,7 +54,7 @@ tuple<GLuint, size_t, size_t> create_texture_8b(path const & fname) {
 	// TODO: implement ...
 	auto const [image_data, image_desc] = [&fname](){
 		if (is_tiff(fname))
-			return load_tiff_exp(fname, true);
+			return load_tiff_desc(fname, true);
 		else
 			throw std::runtime_error("unsupported texture format (only TIFF (*.tif) suported");
 	}();

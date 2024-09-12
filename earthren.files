@@ -1,5 +1,7 @@
 
 SConstruct
+axes_model.cpp
+axes_model.hpp
 camera.cpp
 camera.hpp
 color.hpp

@@ -46,6 +46,7 @@ i: print transformations info */
 #include "io.hpp"
 #include "flat_shader.hpp"
 #include "four_terrain_ui.hpp"
+#include "axes_model.hpp"
 
 using std::vector, std::string, std::pair, std::byte;
 using std::tuple, std::get;
@@ -159,52 +160,12 @@ bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
 	return get<1>(tile) == get<2>(tile);
 }
 
-
 // three lines
 constexpr float axis_verts[] = {
 	0,0,0, 1,0,0,  // x
 	0,0,0, 0,1,0,  // y
 	0,0,0, 0,0,1  // z
 };
-
-class axes_model {
- public:
-	axes_model(GLuint axes_vbo);
-	void draw(flat_shader & program, mat4 const & local_to_screen);
-
- private:
-	GLuint _axes_vbo;
-};
-
-axes_model::axes_model(GLuint axes_vbo)
-	: _axes_vbo{axes_vbo}
-{}
-
-void axes_model::draw(flat_shader & program, mat4 const & local_to_screen) {
-	// TODO: we want VAO there
-
-	program.local_to_screen(local_to_screen);
-
-	GLint const position_loc = program.position_location();
-
-	glEnableVertexAttribArray(position_loc);
-	glBindBuffer(GL_ARRAY_BUFFER, _axes_vbo);
-
-	// x
-	program.color(vec3{1,0,0});
-	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-	glDrawArrays(GL_LINES, 0, 2);
-
-	// y
-	program.color(vec3{0,1,0});
-	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-	glDrawArrays(GL_LINES, 2, 2);
-
-	// z
-	program.color(vec3{0,0,1});
-	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-	glDrawArrays(GL_LINES, 4, 2);
-}
 
 GLuint push_data(void const * data, size_t size_in_bytes) {
 	GLuint vbo;
@@ -302,7 +263,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	string const flat_vs = read_file("flat_shader.vs"),
 		flat_fs = read_file("flat_shader.fs");
-	GLint const flat_shader_program_id = get_shader_program(flat_vs.c_str(), flat_fs.c_str());
+	GLuint const flat_shader_program_id = get_shader_program(flat_vs.c_str(), flat_fs.c_str());
 
 	flat_shader flat_prog{flat_shader_program_id};  // TODO: rename flat_shader_program flat_shader{flat_shader_program_id};
 
@@ -417,7 +378,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		
 		// draw tiles
 		for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
-			for (int col = 0; col < grid_cols; ++col) {
+			for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
 				size_t const tile_idx = 2 * (row*grid_cols + col);
 				GLuint const height_map = get<0>(tiles[tile_idx]),
 					satellite_map = get<0>(tiles[tile_idx+1]);
@@ -500,8 +461,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glBindVertexArray(0);  // unbind VAO
 
-		// render axis there
-		flat_prog.use();
+		flat_prog.use();  // render axis there
 
 		// we want to put axes to the left bottom corner in a camera space (so the position never change, just the rotation)
 		mat4 const cam_rot = mat4{glm::mat3{V}};

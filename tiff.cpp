@@ -77,12 +77,10 @@ unique_ptr<byte> flip_copy(byte const * pixels, size_t w, size_t h, size_t image
 
 	unique_ptr<byte> flipped_pixels{new byte[image_size]};
 	copy_pixels(flipped_view, interleaved_view(w, h, (PixelType *)flipped_pixels.get(), w*sizeof(PixelType)));
-	return move(flipped_pixels);
+	return flipped_pixels;
 }
 
-
-// TODO: _exp find a bether name
-tuple<unique_ptr<byte>, tiff_data_desc> load_tiff_exp(path const & tiff_file, bool flip) {
+tuple<unique_ptr<byte>, tiff_data_desc> load_tiff_desc(path const & tiff_file, bool flip) {
 	ifstream fin{tiff_file};
 	assert(fin.is_open());
 
