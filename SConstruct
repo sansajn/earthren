@@ -73,7 +73,7 @@ def build():
 	env.Program(['height_scale.cpp', height_scale_common, imgui])
 
 	# four terrain sample
-	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp',
+	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
 		'axes_model.cpp', 'four_terrain_ui.cpp', imgui])
 
 

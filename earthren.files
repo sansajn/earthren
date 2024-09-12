@@ -215,6 +215,8 @@ normal.gs
 normal.vs
 normals.cpp
 plot_sinxy.cpp
+quad.cpp
+quad.hpp
 readme.md
 satellite_map.cpp
 shader.cpp
