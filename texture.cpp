@@ -14,7 +14,7 @@ tuple<GLuint, size_t, size_t> create_texture_16b(path const & fname) {
 		if (is_tiff(fname))
 			return load_tiff_exp(fname, true);
 		else
-			throw std::runtime_error("unsupported height map image format (only TIFF (*.tiff) suported");
+			throw std::runtime_error("unsupported texture format (only TIFF (*.tif) suported");
 	}();
 
 	spdlog::info("{} ({}x{}) image loaded", fname.c_str(), image_desc.width, image_desc.height);
@@ -56,7 +56,7 @@ tuple<GLuint, size_t, size_t> create_texture_8b(path const & fname) {
 		if (is_tiff(fname))
 			return load_tiff_exp(fname, true);
 		else
-			throw std::runtime_error("unsupported heightt map image format (only TIFF (*.tiff) suported");
+			throw std::runtime_error("unsupported texture format (only TIFF (*.tif) suported");
 	}();
 
 	// TODO: we need to flip the data there

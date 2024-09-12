@@ -25,7 +25,7 @@ i: print transformations info */
 #include <cassert>
 #include <cstddef>
 #include <csignal>
-#include <fmt/core.h>
+#include <fmt/core.h>  // replacement for std::format
 #include <boost/stacktrace.hpp>
 #include <string.h>  // for posix strsignal()
 #include <SDL.h>
@@ -37,7 +37,6 @@ i: print transformations info */
 #include <spdlog/spdlog.h>
 #include "imgui/imgui.h"
 #include "imgui/examples/imgui_impl_sdl.h"
-#include "imgui/examples/imgui_impl_opengl3.h"
 #include "glmprint.hpp"
 #include "camera.hpp"
 #include "color.hpp"
@@ -46,6 +45,7 @@ i: print transformations info */
 #include "shader.hpp"
 #include "io.hpp"
 #include "flat_shader.hpp"
+#include "four_terrain_ui.hpp"
 
 using std::vector, std::string, std::pair, std::byte;
 using std::tuple, std::get;
@@ -91,7 +91,7 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc);
 \return (vao, vbo, vertex_count) tuple. */
 tuple<GLuint, GLuint, unsigned> create_mesh(GLint vertices_loc, GLint uv_loc);
 
-/*! Returns vector of data in a (position:3, texcoord:2) format per vertex and array of indices to form a model.
+/*! Returns unit quad begins in (0,0) and ends in (1,1) point as vector of (position:3, texcoord:2) pair per vertex and array of indices to form a model.
 To create a OpenGL object use code
 auto [vertices, indices] = make_quad(quad_w, quad_h);
 // ...
@@ -227,7 +227,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	path const height_map_path = (argc > 1) ? path{argv[1]} : HEIGHT_MAP_TEXTURE;
 
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
+	SDL_Window * window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -241,19 +241,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		<< "GL_RENDERER: " << glGetString(GL_RENDERER) << "\n"
 		<< "GLSL_VERSION: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
 	
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-
-	[[maybe_unused]] ImGuiIO & io = ImGui::GetIO();
-	io.IniFilename = config_file_name;
-	// we can configure ImGuiIO via io variable ...
-
-	ImGui::StyleColorsDark();
-
-	// Setup Platform/Renderer bindings
-	ImGui_ImplSDL2_InitForOpenGL(window, &context);
-	ImGui_ImplOpenGL3_Init();
+	four_terrain_ui ui;
+	ui.height_scale = TERRAIN_HEIGHT_SCALE;
+	ui.init(config_file_name);
+	ui.setup(window, context);
 
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
@@ -328,22 +319,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
 	for (size_t row = 0; row < grid_rows; ++row) {
 		for (size_t col = 0; col < grid_cols; ++col) {
-			// TODO: generate tile names
-			string const height_tile_name = fmt::format("tile_{}_{}.tif", col+1, row+1);  // we starts with tile_1_1.tif file
+			string const height_tile_name = fmt::format("learn/tiles_utm/tile_{}_{}.tif", col+1, row+1);
 
 			auto const height_tile = create_texture_16b(height_tile_name);
-			assert(is_square(height_tile)); // height_width == height_height
+			assert(is_square(height_tile));
 			tiles.push_back(height_tile);
-			// auto const [height_map, texture_width, texture_height] = create_texture_16b(height_map_path);
-			// assert(texture_width == texture_height);  // we are expecting square elevation tiles
 
-			string const satellite_tile_name = fmt::format("tile_{}_{}_rgb.tif", col+1, row+1);
-
+			string const satellite_tile_name = fmt::format("learn/fourtiles/tile_{}_{}.tif", col+1, row+1);
 			auto const satellite_tile = create_texture_8b(satellite_tile_name);
 			assert(is_square(satellite_tile));
 			tiles.push_back(satellite_tile);
-			// auto const [satellite_map, satellite_width, satellite_height] = create_texture_8b(SATELLITE_MAP_TEXTURE);
-			// assert(satellite_width == satellite_height);  // we are expecting square elevation tiles
 		}
 	}
 
@@ -374,7 +359,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		.calculate_shades = true
 	};
 
-	float height_scale = TERRAIN_HEIGHT_SCALE;
 	float const model_scale = TERRAIN_SIZE_SCALE;
 
 	auto t_prev = steady_clock::now();
@@ -412,20 +396,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		if (events.camera_switch)
 			cout << with_label{"V", V};
 
-		// TODO: we want GUI stuff to remove out of the loop
-
-		// create gui
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplSDL2_NewFrame(window);
-		ImGui::NewFrame();
-
-		ImGui::Begin("Options");  // begin window
-
-		ImGui::DragFloat("Height Scale", &height_scale, 0.1f, 1.0f, 20.0f);
-
-		ImGui::End();  // end window
-
-		ImGui::SetWindowFocus(nullptr);
+		ui.create();  // do we need to do this every frame?
 
 		// render
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);  // clear buffer
@@ -448,19 +419,28 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		auto const & first_elevation_tile = *begin(tiles);
 		size_t const texture_width = get<1>(first_elevation_tile);
-		size_t const texture_height =  get<2>(first_elevation_tile);
+		size_t const texture_height = get<2>(first_elevation_tile);
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);
 		
 		// draw tiles
-		for (size_t row = 0; row < grid_rows; ++row) {
-			for (size_t col = 0; col < grid_cols; ++col) {
-
+		// for (int row = 0; row < grid_rows; ++row) {
+		// 	for (int col = 0; col < grid_cols; ++col) {
+		{{
+				size_t row = 0,
+					col = 0;
 				size_t const tile_idx = 2 * (row*grid_cols + col);
 				GLuint const height_map = get<0>(tiles[tile_idx]),
 					satellite_map = get<0>(tiles[tile_idx+1]);
 
+				// TODO: wrong model pos
 				// vec2 const model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
-				vec2 model_pos = quad_size * (vec2{col, row} - vec2(grid_cols, grid_rows)/2.0f) * model_scale;
+				// vec2 model_pos = (vec2{col, -row} + vec2{-1, 1})*quad_size*model_scale;
+				// vec2 model_pos = (vec2{col, row} - vec2(grid_cols, grid_rows)/2.0f) * quad_size * model_scale;
+				vec2 model_pos = vec2{col, -row} * quad_size * model_scale;
+				// print("terrain: {},{}:\n", col+1, row+1);
+				// print_vector(model_pos, "  terrain-pos");
+
+
 				mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 				mat4 const local_to_screen = P*V*M;
 
@@ -491,7 +471,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 				glUniform1i(use_shading_loc, 0);  // just set use_shading to false
 
 			glUniform2f(height_map_size_loc, texture_width, texture_height);
-			glUniform1f(height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
+			glUniform1f(height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
 			glUniform1f(eleveation_scale_loc, elevation_scale);  // TODO: can we set uniform before we use a program?
 
 			glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
@@ -511,7 +491,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 			glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
-			glUniform1f(lightdir_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
+			glUniform1f(lightdir_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
 			glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
@@ -529,7 +509,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 			glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
-			glUniform1f(outline_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
+			glUniform1f(outline_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
 			glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
@@ -557,8 +537,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		axes.draw(flat_prog, axes_local_to_screen);
 
-		ImGui::Render();  // render ImGui
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		// ImGui::Render();  // render ImGui
+		// ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		ui.render();
 
 		SDL_GL_SwapWindow(window);
 	}
@@ -571,9 +552,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glDeleteVertexArrays(1, &vao);
 	glDeleteProgram(shader_program);
 
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplSDL2_Shutdown();
-	ImGui::DestroyContext();
+	ui.shutdown();
 
 	SDL_GL_DeleteContext(context);
 	SDL_DestroyWindow(window);
@@ -853,7 +832,7 @@ pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
 }
 
 // TODO: rename to push_quad_mesh()
-// TODO: the funciton is not working ina case we want to render witha different shaader program, because losition_loc can cenge there
+// TODO: the funciton is not working in a case we want to render with a different shaader program, because losition_loc can change there
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	constexpr unsigned quad_w = 100,
 		quad_h = 100;

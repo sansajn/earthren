@@ -36,5 +36,5 @@ void map_camera::update() {
 }
 
 vec3 map_camera::forward() const {
-	normalize(-vec3{_view[2]});
+	return normalize(-vec3{_view[2]});
 }
