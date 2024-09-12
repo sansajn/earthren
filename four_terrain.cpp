@@ -83,7 +83,7 @@ path const VERTEX_SHADER_FILE = "four_terrain.vs",
 path const HEIGHT_MAP_TEXTURE = "data/tile_1_1.tif";  // 16bit GRAY bitmap
 path const SATELLITE_MAP_TEXTURE = "data/tile_1_1_rgb.tif";  // 8bit RGB bitmap
 
-constexpr char const * config_file_name = "four_terrain.ini";
+path const config_file_path = "four_terrain.ini";
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc);
 
@@ -243,7 +243,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	
 	four_terrain_ui ui;
 	ui.height_scale = TERRAIN_HEIGHT_SCALE;
-	ui.init(config_file_name);
+	ui.init(config_file_path);
 	ui.setup(window, context);
 
 	glFrontFace(GL_CCW);
