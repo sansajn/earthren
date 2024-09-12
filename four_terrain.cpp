@@ -129,6 +129,10 @@ struct input_events {  // TOOD: we want constructor to init all members to false
 	bool zoom_in;
 	bool camera_switch;
 	bool info_request;  // TODO: this can't be grouped as map_events, it behaves like an event but not map_event
+
+	void reset() {
+		zoom_in = camera_switch = info_request = false;
+	}
 };
 
 struct render_features {  // list of selected rendering features
@@ -142,7 +146,7 @@ struct render_features {  // list of selected rendering features
 /*! Process user input.
 \returns false in case user want to quit, otherwise true. */
 template <typename Camera>
-bool process_user_events(Camera & cam, input_mode & mode, render_features & features,
+bool input(Camera & cam, input_mode & mode, render_features & features,
 	input_events & events);
 
 // input handling functions
@@ -153,12 +157,14 @@ void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & 
 void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
 	input_events & events);  //!< handle camera movement, rotations
 
-// TODO: maybe we want to also apply mouse movement there (based on app physics)
 void update(free_camera & cam, input_mode const & mode, float dt);
 
 bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
 	return get<1>(tile) == get<2>(tile);
 }
+
+/*! \returns list of (TID, width, height) tripet for for each terrain tile. */
+vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols);
 
 // three lines
 constexpr float axis_verts[] = {
@@ -234,9 +240,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	GLint const lightdir_shader_program = get_shader_program(lightdir_vs.c_str(), lightdir_fs.c_str(), lightdir_gs.c_str());
 
-	// TODO: position unused, should I use different VAO in case of new shader program?
 	GLint const lightdir_position_loc = glGetAttribLocation(lightdir_shader_program, "position");
-	assert(position_loc == lightdir_position_loc);  // TODO: this is temporary
+	assert(position_loc == lightdir_position_loc);  // TODO: agree on locations in shader programs
 
 	GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
 	GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
@@ -253,7 +258,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// TODO: position unused, should I use different VAO in case of new shader program?
 	GLint const outline_position_loc = glGetAttribLocation(outline_shader_program, "position");
-	assert(position_loc == outline_position_loc);  // TODO: this is temporary
+	assert(position_loc == outline_position_loc);  // TODO: agree on locations in shader programs
 
 	GLint const outline_heights_loc = glGetUniformLocation(outline_shader_program, "heights");
 	GLint const outline_height_map_size_loc = glGetUniformLocation(outline_shader_program, "height_map_size");
@@ -276,22 +281,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		grid_cols = 2;
 	assert((grid_rows % 2) == 0 && (grid_cols % 2) == 0);
 
-	// TODO: move this into read_tiles() function
-	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
-	for (size_t row = 0; row < grid_rows; ++row) {
-		for (size_t col = 0; col < grid_cols; ++col) {
-			string const height_tile_name = fmt::format("learn/tiles_utm/tile_{}_{}.tif", col+1, row+1);
-
-			auto const height_tile = create_texture_16b(height_tile_name);
-			assert(is_square(height_tile));
-			tiles.push_back(height_tile);
-
-			string const satellite_tile_name = fmt::format("learn/fourtiles/tile_{}_{}.tif", col+1, row+1);
-			auto const satellite_tile = create_texture_8b(satellite_tile_name);
-			assert(is_square(satellite_tile));
-			tiles.push_back(satellite_tile);
-		}
-	}
+	vector<tuple<GLuint, size_t, size_t>> tiles = read_tiles(grid_rows, grid_cols);  // list of [elevation, satelite, ...] tiles for each terrain
 
 	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
 
@@ -335,7 +325,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		mat4 P, V;
 		if (!mode.detail_camera) {
 			// input
-			if (!process_user_events(cam, mode, features, events))
+			if (!input(cam, mode, features, events))
 				break;  // user wants to quit
 
 			// update
@@ -345,7 +335,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		}
 		else {  // free_camera
 			// input
-			if (!process_user_events(cam_detail, mode, features, events))
+			if (!input(cam_detail, mode, features, events))
 				break;  // user wants to quit
 
 			// update
@@ -671,14 +661,10 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 }
 
 template <typename Camera>
-bool process_user_events(Camera & cam, input_mode & mode, render_features & features,
-	input_events & events) {  // TODO: rename to input()
+bool input(Camera & cam, input_mode & mode, render_features & features,
+	input_events & events) {
 
-	events = {  // resets all input events
-		.zoom_in = false,
-		.camera_switch = false,
-		.info_request = false
-	};
+	events.reset();
 
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {  // we want to fully process the event queue, update state and then render
@@ -764,8 +750,7 @@ pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
 	return {verts, indices};
 }
 
-// TODO: rename to push_quad_mesh()
-// TODO: the funciton is not working in a case we want to render with a different shaader program, because losition_loc can change there
+// TODO: the funciton is not working in a case we want to render with a different shader program, because losition_loc can change there
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	constexpr unsigned quad_w = 100,
 		quad_h = 100;
@@ -780,13 +765,11 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, size(vertices)*sizeof(float), vertices.data(), GL_STATIC_DRAW);
-	// TODO: we can use push_data() there
 
 	GLuint ibo = 0;  // create index bufffer object
 	glGenBuffers(1, &ibo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
-	// TODO: we need push_element_data() there
 
 	// bind (x,y,z) data
 	constexpr size_t stride = (3+2)*sizeof(float);
@@ -796,4 +779,23 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	glBindVertexArray(0);  // unbind vertex array
 
 	return {vao, vbo, ibo, size(indices)};
+}
+
+vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols) {
+	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
+	for (size_t row = 0; row < grid_rows; ++row) {
+		for (size_t col = 0; col < grid_cols; ++col) {
+			string const height_tile_name = fmt::format("learn/tiles_utm/tile_{}_{}.tif", col+1, row+1);
+
+			auto const height_tile = create_texture_16b(height_tile_name);
+			assert(is_square(height_tile));
+			tiles.push_back(height_tile);
+
+			string const satellite_tile_name = fmt::format("learn/fourtiles/tile_{}_{}.tif", col+1, row+1);
+			auto const satellite_tile = create_texture_8b(satellite_tile_name);
+			assert(is_square(satellite_tile));
+			tiles.push_back(satellite_tile);
+		}
+	}
+	return tiles;
 }
