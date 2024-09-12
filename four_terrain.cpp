@@ -124,11 +124,12 @@ struct input_mode {  // list of active input contol modes
 		move_right = false;  // d
 };
 
-// TODO: rename to map_events?
-struct input_events {  // TOOD: we want constructor to init all members to false
+struct input_events {
 	bool zoom_in;
 	bool camera_switch;
-	bool info_request;  // TODO: this can't be grouped as map_events, it behaves like an event but not map_event
+	bool info_request;
+
+	input_events() : zoom_in{false}, camera_switch{false}, info_request{false} {}
 
 	void reset() {
 		zoom_in = camera_switch = info_request = false;
@@ -224,6 +225,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	GLuint const shader_program = get_shader_program(vertex_shader.c_str(), fragment_shader.c_str());
 	GLint const position_loc = glGetAttribLocation(shader_program, "position");
+	assert(position_loc == 0 && "we expect position location to be 0");
+
 	GLint const local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
 	GLint const heights_loc = glGetUniformLocation(shader_program, "heights");
 	GLint const satellite_map_loc = glGetUniformLocation(shader_program, "satellite_map");
@@ -239,9 +242,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		lightdir_fs = read_file(LIGHTDIR_FRAGMENT_SHADER_FILE);
 
 	GLint const lightdir_shader_program = get_shader_program(lightdir_vs.c_str(), lightdir_fs.c_str(), lightdir_gs.c_str());
-
-	GLint const lightdir_position_loc = glGetAttribLocation(lightdir_shader_program, "position");
-	assert(position_loc == lightdir_position_loc);  // TODO: agree on locations in shader programs
+	assert(position_loc == glGetAttribLocation(lightdir_shader_program, "position"));
 
 	GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
 	GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
@@ -255,10 +256,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		outline_fs = read_file(OUTLINE_FRAGMENT_SHADER_FILE);
 
 	GLint const outline_shader_program = get_shader_program(outline_vs.c_str(), outline_fs.c_str(), outline_gs.c_str());
-
-	// TODO: position unused, should I use different VAO in case of new shader program?
-	GLint const outline_position_loc = glGetAttribLocation(outline_shader_program, "position");
-	assert(position_loc == outline_position_loc);  // TODO: agree on locations in shader programs
+	assert(position_loc == glGetAttribLocation(outline_shader_program, "position"));
 
 	GLint const outline_heights_loc = glGetUniformLocation(outline_shader_program, "heights");
 	GLint const outline_height_map_size_loc = glGetUniformLocation(outline_shader_program, "height_map_size");
@@ -270,7 +268,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		flat_fs = read_file("flat_shader.fs");
 	GLuint const flat_shader_program_id = get_shader_program(flat_vs.c_str(), flat_fs.c_str());
 
-	flat_shader flat_prog{flat_shader_program_id};  // TODO: rename flat_shader_program flat_shader{flat_shader_program_id};
+	flat_shader_program flat_shader{flat_shader_program_id};
 
 	// load axes model
 	GLuint const axes_position_vbo = push_axes();
@@ -300,7 +298,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	cam_detail.position = vec3{0, 0, 5.f};
 	cam_detail.look_at(vec3{0, 0, 0});
 
-	input_mode mode;  // TODO: we want either pan or rotate not both on the same time, simplify with enum-class
+	input_mode mode;
 
 	render_features features = {
 		.show_terrain = true,
@@ -403,8 +401,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 						glUniform1i(use_shading_loc, 0);  // just set use_shading to false
 
 					glUniform2f(height_map_size_loc, texture_width, texture_height);
-					glUniform1f(height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
-					glUniform1f(eleveation_scale_loc, elevation_scale);  // TODO: can we set uniform before we use a program?
+					glUniform1f(height_scale_loc, ui.height_scale);
+					glUniform1f(eleveation_scale_loc, elevation_scale);
 
 					glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
@@ -423,7 +421,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 					glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
-					glUniform1f(lightdir_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
+					glUniform1f(lightdir_height_scale_loc, ui.height_scale);
 					glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
@@ -441,7 +439,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
 					glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
-					glUniform1f(outline_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
+					glUniform1f(outline_height_scale_loc, ui.height_scale);
 					glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
@@ -451,7 +449,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glBindVertexArray(0);  // unbind VAO
 
-		flat_prog.use();  // render axis there
+		flat_shader.use();  // render axis there
 
 		// we want to put axes to the left bottom corner in a camera space (so the position never change, just the rotation)
 		mat4 const cam_rot = mat4{glm::mat3{V}};
@@ -460,7 +458,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25,-2.45,-5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
 			axes_local_to_screen = P*M_axes*cam_rot;  //=P*V*V'*M_axes
 
-		axes.draw(flat_prog, axes_local_to_screen);
+		axes.draw(flat_shader, axes_local_to_screen);
 
 		ui.render();
 
@@ -634,7 +632,7 @@ void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & 
 void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
 	[[maybe_unused]] input_events & events) {
 
-	constexpr float dt = 0.1f;  // TODO: this should be function argument
+	constexpr float dt = 0.1f;
 	constexpr float angular_speed = 1.0f/100.0f;  // rad/s
 
 	// handle mouse movement when ctrl is pressed to rotate camera
@@ -691,7 +689,7 @@ bool input(Camera & cam, input_mode & mode, render_features & features,
 }
 
 void update(free_camera & cam, input_mode const & mode, float dt) {
-	constexpr float speed = 1.0f;  // TODO: not velocity?
+	constexpr float speed = 1.0f;
 
 	// update cam position based on mode
 	if (mode.move_forward)
@@ -750,7 +748,6 @@ pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
 	return {verts, indices};
 }
 
-// TODO: the funciton is not working in a case we want to render with a different shader program, because losition_loc can change there
 tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	constexpr unsigned quad_w = 100,
 		quad_h = 100;

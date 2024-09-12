@@ -6,7 +6,7 @@ axes_model::axes_model(GLuint axes_vbo)
 	: _axes_vbo{axes_vbo}
 {}
 
-void axes_model::draw(flat_shader & program, mat4 const & local_to_screen) {
+void axes_model::draw(flat_shader_program & program, mat4 const & local_to_screen) {
 	program.local_to_screen(local_to_screen);
 
 	GLint const position_loc = program.position_location();

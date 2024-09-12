@@ -4,13 +4,13 @@
 #include <glm/mat4x4.hpp>
 #include <GLES3/gl32.h>
 
-/*! Shader program with primitive color. */
-class flat_shader {
+/*! Shader program to draw primitive with color. */
+class flat_shader_program {
 public:
-	flat_shader(GLuint program_id);
+	flat_shader_program(GLuint program_id);
 	void use() const;
 	GLint position_location() const;
-	void color(glm::vec3 const & rgb);
+	void color(glm::vec3 const & rgb);  //!< \param[in] rgb normalized primitive color
 	void local_to_screen(glm::mat4 const & T);
 
 private:

@@ -7,7 +7,7 @@
 class axes_model {
 public:
 	axes_model(GLuint axes_vbo);
-	void draw(flat_shader & program, glm::mat4 const & local_to_screen);
+	void draw(flat_shader_program & program, glm::mat4 const & local_to_screen);
 
 private:
 	GLuint _axes_vbo;
