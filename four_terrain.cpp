@@ -310,12 +310,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLuint const axes_position_vbo = push_axes();
 	axes_model axes{axes_position_vbo};
 
-	// TODO: we want to read all four textures there
-	// load texture
+	// load textures
 	constexpr size_t grid_rows = 2,
 		grid_cols = 2;
 	assert((grid_rows % 2) == 0 && (grid_cols % 2) == 0);
 
+	// TODO: move this into read_tiles() function
 	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
 	for (size_t row = 0; row < grid_rows; ++row) {
 		for (size_t col = 0; col < grid_cols; ++col) {
@@ -403,19 +403,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glBindVertexArray(vao);  // VAO is independent of used program
 
-		// float const model_scale = TERRAIN_SIZE_SCALE;
-		// vec2 const model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
-		// mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
-		// mat4 const local_to_screen = P*V*M;
-
-		// if (events.info_request) {
-		// 	cout << "info:\n"
-		// 		<< "model_scale=" << model_scale << '\n'
-		// 		<< "model_pos=" << model_pos << '\n'
-		// 		<< with_label{"V", V} << '\n'
-		// 		<< with_label{"local_to_screen", local_to_screen} << '\n'
-		// 		<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << '\n';
-		// }
+		if (events.info_request) {
+			cout << "info:\n"
+				<< "model_scale=" << model_scale << '\n'
+				<< with_label{"V", V} << '\n'
+				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << '\n';
+		}
 
 		auto const & first_elevation_tile = *begin(tiles);
 		size_t const texture_width = get<1>(first_elevation_tile);
@@ -423,112 +416,94 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);
 		
 		// draw tiles
-		// for (int row = 0; row < grid_rows; ++row) {
-		// 	for (int col = 0; col < grid_cols; ++col) {
-		{{
-				size_t row = 0,
-					col = 0;
+		for (int row = 0; row < grid_rows; ++row) {
+			for (int col = 0; col < grid_cols; ++col) {
 				size_t const tile_idx = 2 * (row*grid_cols + col);
 				GLuint const height_map = get<0>(tiles[tile_idx]),
 					satellite_map = get<0>(tiles[tile_idx+1]);
 
-				// TODO: wrong model pos
-				// vec2 const model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
-				// vec2 model_pos = (vec2{col, -row} + vec2{-1, 1})*quad_size*model_scale;
-				// vec2 model_pos = (vec2{col, row} - vec2(grid_cols, grid_rows)/2.0f) * quad_size * model_scale;
-				vec2 model_pos = vec2{col, -row} * quad_size * model_scale;
-				// print("terrain: {},{}:\n", col+1, row+1);
-				// print_vector(model_pos, "  terrain-pos");
-
-
+				vec2 model_pos = vec2{col, -row} * quad_size * model_scale - vec2{grid_cols, 0} * quad_size*model_scale*0.5f;
 				mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 				mat4 const local_to_screen = P*V*M;
 
-		// render terrain
-		if (features.show_terrain) {
-			glUseProgram(shader_program);
+				// render terrain
+				if (features.show_terrain) {
+					glUseProgram(shader_program);
 
-			// bind height map texture
-			// GLuint const & tile = tiles[0];  // TODO: we do not need list of tiles, just a tile
-			glUniform1i(heights_loc, 0);  // set height map sampler to use texture unit 0
-			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
+					// bind height map texture
+					glUniform1i(heights_loc, 0);  // set height map sampler to use texture unit 0
+					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
 
-			if (features.show_satellite) {
-				glUniform1i(use_satellite_map_loc, 1);  // set use_satellite_map to true
-				glUniform1i(satellite_map_loc, 1);  // set satellite map sampler to use testure unit 1
-				glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
-				glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
-			}
-			else {
-				glUniform1i(use_satellite_map_loc, 0);  // just set use_satellite_map to false
-			}
+					if (features.show_satellite) {
+						glUniform1i(use_satellite_map_loc, 1);  // set use_satellite_map to true
+						glUniform1i(satellite_map_loc, 1);  // set satellite map sampler to use testure unit 1
+						glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
+						glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
+					}
+					else {
+						glUniform1i(use_satellite_map_loc, 0);  // just set use_satellite_map to false
+					}
 
-			if (features.calculate_shades) {
-				glUniform1i(use_shading_loc, 1);  // just set use_shading to true
-			}
-			else
-				glUniform1i(use_shading_loc, 0);  // just set use_shading to false
+					if (features.calculate_shades) {
+						glUniform1i(use_shading_loc, 1);  // just set use_shading to true
+					}
+					else
+						glUniform1i(use_shading_loc, 0);  // just set use_shading to false
 
-			glUniform2f(height_map_size_loc, texture_width, texture_height);
-			glUniform1f(height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
-			glUniform1f(eleveation_scale_loc, elevation_scale);  // TODO: can we set uniform before we use a program?
+					glUniform2f(height_map_size_loc, texture_width, texture_height);
+					glUniform1f(height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
+					glUniform1f(eleveation_scale_loc, elevation_scale);  // TODO: can we set uniform before we use a program?
 
-			glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
-			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-		}
+					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				}
 
-		// render light directions
-		if (features.show_lightdir) {
-			glUseProgram(lightdir_shader_program);
+				// render light directions
+				if (features.show_lightdir) {
+					glUseProgram(lightdir_shader_program);
 
-			glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
+					glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
 
-			// bind height map
-			glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
-			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
+					// bind height map
+					glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
+					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
-			glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
-			glUniform1f(lightdir_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
-			glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
+					glUniform1f(lightdir_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
+					glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
-			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-		}
+					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				}
 
-		// render triangle outlines
-		if (features.show_outline) {
-			glUseProgram(outline_shader_program);
+				// render triangle outlines
+				if (features.show_outline) {
+					glUseProgram(outline_shader_program);
 
-			glUniform3fv(outline_line_color_loc, 1, value_ptr(rgb::blue));
+					glUniform3fv(outline_line_color_loc, 1, value_ptr(rgb::blue));
 
-			// bind height map
-			glUniform1i(outline_heights_loc, 0);  // set sampler s to use texture unit 0
-			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
+					// bind height map
+					glUniform1i(outline_heights_loc, 0);  // set sampler s to use texture unit 0
+					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
-			glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
-			glUniform1f(outline_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
-			glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
+					glUniform1f(outline_height_scale_loc, ui.height_scale);  // TODO: can we set uniform before we use a program?
+					glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
-			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-		}
-
-			}
-		}
-
-
+					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				}
+			}  // for (col ...
+		}  // for (row ...
 
 		glBindVertexArray(0);  // unbind VAO
 
-		// TODO: render axis there
+		// render axis there
 		flat_prog.use();
 
-		// TODO: we want to put axess not in the center, but into the left bottom corner in a camera space (so the positoin never change, just the rotation)
-		// mat4 const M_axes = translate(mat4{1}, vec3{0,0,0}),  // put axis into the middle
-		// 	axes_local_to_screen = P*V*M_axes;
-
+		// we want to put axes to the left bottom corner in a camera space (so the position never change, just the rotation)
 		mat4 const cam_rot = mat4{glm::mat3{V}};
 
 		// T*S*R
@@ -537,15 +512,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		axes.draw(flat_prog, axes_local_to_screen);
 
-		// ImGui::Render();  // render ImGui
-		// ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		ui.render();
 
 		SDL_GL_SwapWindow(window);
 	}
 	
-	// for(auto tile : tiles)  // delete textures
-		// glDeleteTextures(1, &tile);
+	for(auto tile : tiles)  // delete textures
+		glDeleteTextures(1, &get<0>(tile));
 
 	glDeleteBuffers(1, &ibo);
 	glDeleteBuffers(1, &vbo);
