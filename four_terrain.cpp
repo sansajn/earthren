@@ -48,6 +48,7 @@ i: print transformations info */
 #include "four_terrain_ui.hpp"
 #include "axes_model.hpp"
 #include "quad.hpp"
+#include "four_terrain_shader_program.hpp"
 
 using std::vector, std::string, std::pair, std::byte;
 using std::tuple, std::get;
@@ -206,22 +207,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 
-	// load shader program for terrain rendering
-	string const vertex_shader = read_file(VERTEX_SHADER_FILE),
-		fragment_shader = read_file(FRAGMENT_SHADER_FILE);
-
-	GLuint const shader_program = get_shader_program(vertex_shader.c_str(), fragment_shader.c_str());
-	GLint const position_loc = glGetAttribLocation(shader_program, "position");
-	assert(position_loc == 0 && "we expect position location to be 0");
-
-	GLint const local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
-	GLint const heights_loc = glGetUniformLocation(shader_program, "heights");
-	GLint const satellite_map_loc = glGetUniformLocation(shader_program, "satellite_map");
-	GLint const height_map_size_loc = glGetUniformLocation(shader_program, "height_map_size");
-	GLint const height_scale_loc = glGetUniformLocation(shader_program, "height_scale");
-	GLint const eleveation_scale_loc = glGetUniformLocation(shader_program, "elevation_scale");
-	GLint const use_satellite_map_loc = glGetUniformLocation(shader_program, "use_satellite_map");
-	GLint const use_shading_loc = glGetUniformLocation(shader_program, "use_shading");
+	four_terrain_shader_program shader;
 
 	// load shader program to visualize light direction
 	string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
@@ -229,7 +215,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		lightdir_fs = read_file(LIGHTDIR_FRAGMENT_SHADER_FILE);
 
 	GLint const lightdir_shader_program = get_shader_program(lightdir_vs.c_str(), lightdir_fs.c_str(), lightdir_gs.c_str());
-	assert(position_loc == glGetAttribLocation(lightdir_shader_program, "position"));
+	assert(shader.position_location() == glGetAttribLocation(lightdir_shader_program, "position"));
 
 	GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
 	GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
@@ -243,7 +229,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		outline_fs = read_file(OUTLINE_FRAGMENT_SHADER_FILE);
 
 	GLint const outline_shader_program = get_shader_program(outline_vs.c_str(), outline_fs.c_str(), outline_gs.c_str());
-	assert(position_loc == glGetAttribLocation(outline_shader_program, "position"));
+	assert(shader.position_location() == glGetAttribLocation(outline_shader_program, "position"));
 
 	GLint const outline_heights_loc = glGetUniformLocation(outline_shader_program, "heights");
 	GLint const outline_height_map_size_loc = glGetUniformLocation(outline_shader_program, "height_map_size");
@@ -275,7 +261,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// create terrain mash
 	constexpr float quad_size = 1.0f;
-	auto const [vao, vbo, ibo, element_count] = create_quad_mesh(position_loc);
+	auto const [vao, vbo, ibo, element_count] = create_quad_mesh(shader.position_location());
 
 	// camera related stuff
 	map_camera cam{20.0f};
@@ -364,34 +350,36 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 				// render terrain
 				if (features.show_terrain) {
-					glUseProgram(shader_program);
+					shader.use();
 
 					// bind height map texture
-					glUniform1i(heights_loc, 0);  // set height map sampler to use texture unit 0
+					shader.heights(0);  // set height map sampler to use texture unit 0
 					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
 					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
 
 					if (features.show_satellite) {
-						glUniform1i(use_satellite_map_loc, 1);  // set use_satellite_map to true
-						glUniform1i(satellite_map_loc, 1);  // set satellite map sampler to use testure unit 1
+						shader.use_satellite_map(true);
+						shader.satellite_map(1);  // set satellite map sampler to use texture unit 1
 						glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
 						glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
 					}
-					else {
-						glUniform1i(use_satellite_map_loc, 0);  // just set use_satellite_map to false
-					}
-
-					if (features.calculate_shades) {
-						glUniform1i(use_shading_loc, 1);  // just set use_shading to true
-					}
 					else
-						glUniform1i(use_shading_loc, 0);  // just set use_shading to false
+						shader.use_satellite_map(false);
 
-					glUniform2f(height_map_size_loc, texture_width, texture_height);
-					glUniform1f(height_scale_loc, ui.height_scale);
-					glUniform1f(eleveation_scale_loc, elevation_scale);
+					if (features.calculate_shades)
+						shader.use_shading(true);
+					else
+						shader.use_shading(false);
 
-					glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					// glUniform2f(height_map_size_loc, texture_width, texture_height);
+					shader.height_map_size(vec2{texture_width, texture_height});
+					// glUniform1f(height_scale_loc, ui.height_scale);
+					shader.height_scale(ui.height_scale);
+					// glUniform1f(eleveation_scale_loc, elevation_scale);
+					shader.elevation_scale(elevation_scale);
+
+					// glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					shader.local_to_screen(local_to_screen);
 
 					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 				}
@@ -458,7 +446,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glDeleteBuffers(1, &ibo);
 	glDeleteBuffers(1, &vbo);
 	glDeleteVertexArrays(1, &vao);
-	glDeleteProgram(shader_program);
+	// glDeleteProgram(shader_program);
 
 	ui.shutdown();
 

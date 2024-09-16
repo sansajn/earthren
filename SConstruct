@@ -74,7 +74,7 @@ def build():
 
 	# four terrain sample
 	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
-		'axes_model.cpp', 'four_terrain_ui.cpp', imgui])
+		'axes_model.cpp', 'four_terrain_ui.cpp', 'four_terrain_shader_program.cpp', imgui])
 
 
 def configure(env, dependency_list):
