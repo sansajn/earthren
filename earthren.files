@@ -221,6 +221,8 @@ quad.cpp
 quad.hpp
 readme.md
 satellite_map.cpp
+set_uniform.cpp
+set_uniform.hpp
 shader.cpp
 shader.hpp
 sinxy_heights.cpp

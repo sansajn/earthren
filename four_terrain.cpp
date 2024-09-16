@@ -371,14 +371,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 					else
 						shader.use_shading(false);
 
-					// glUniform2f(height_map_size_loc, texture_width, texture_height);
 					shader.height_map_size(vec2{texture_width, texture_height});
-					// glUniform1f(height_scale_loc, ui.height_scale);
 					shader.height_scale(ui.height_scale);
-					// glUniform1f(eleveation_scale_loc, elevation_scale);
 					shader.elevation_scale(elevation_scale);
-
-					// glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 					shader.local_to_screen(local_to_screen);
 
 					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);

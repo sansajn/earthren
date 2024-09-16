@@ -5,6 +5,7 @@
 #include "four_terrain_shader_program.hpp"
 #include "io.hpp"
 #include "shader.hpp"
+#include "set_uniform.hpp"
 
 using std::string;
 using std::filesystem::path;
@@ -42,19 +43,19 @@ void four_terrain_shader_program::use() {
 }
 
 void four_terrain_shader_program::local_to_screen(mat4 const & T) {
-	glUniformMatrix4fv(_local_to_screen, 1, GL_FALSE, value_ptr(T));
+	set_uniform(_local_to_screen, T);
 }
 
 void four_terrain_shader_program::heights(int texture_unit_id) {
-	glUniform1i(_heights, texture_unit_id);
+	set_uniform(_heights, texture_unit_id);
 }
 
 void four_terrain_shader_program::elevation_scale(float scale) {
-	glUniform1f(_elevation_scale, scale);
+	set_uniform(_elevation_scale, scale);
 }
 
 void four_terrain_shader_program::height_scale(float scale) {
-	glUniform1f(_height_scale, scale);
+	set_uniform(_height_scale, scale);
 }
 
 GLint four_terrain_shader_program::position_location() const {
@@ -62,17 +63,17 @@ GLint four_terrain_shader_program::position_location() const {
 }
 
 void four_terrain_shader_program::satellite_map(int texture_unit_id) {
-	glUniform1i(_satellite_map, texture_unit_id);
+	set_uniform(_satellite_map, texture_unit_id);
 }
 
 void four_terrain_shader_program::use_satellite_map(bool value) {
-	glUniform1i(_use_satellite_map, value ? 1 : 0);
+	set_uniform(_use_satellite_map, value);
 }
 
 void four_terrain_shader_program::use_shading(bool value) {
-	glUniform1i(_use_shading, value ? 1 : 0);
+	set_uniform(_use_shading, value);
 }
 
 void four_terrain_shader_program::height_map_size(vec2 const & size) {
-	glUniform2fv(_height_map_size, 1, value_ptr(size));
+	set_uniform(_height_map_size, size);
 }
