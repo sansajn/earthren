@@ -16,6 +16,8 @@ flat_shader.hpp
 flat_shader.vs
 four_terrain.cpp
 four_terrain.vs
+four_terrain_shader_program.cpp
+four_terrain_shader_program.hpp
 four_terrain_ui.cpp
 four_terrain_ui.hpp
 free_camera.cpp
