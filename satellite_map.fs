@@ -61,8 +61,7 @@ void main() {
    vec2 uv_p = floor(st);
    vec3 n = calculate_normal(uv_p, heights);
 
-	// TODO: in case satellite_tile_size < satellite_tile_size this doesnt produce correct mapping
-	vec3 satellite_color = vec3(texture(satellite_map, uv_p / satellite_tile_size).rgb);
+	vec3 satellite_color = vec3(texture(satellite_map, uv_p / (normal_tile_size - 1.0)).rgb);
 	if (!use_satellite_map)
 		satellite_color = vec3(0.8, 0.8, 0.8);
 

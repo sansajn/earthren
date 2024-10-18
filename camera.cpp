@@ -1,8 +1,9 @@
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
-#include "camera.h"
+#include "camera.hpp"
 
-using glm::mat4, glm::vec3, glm::translate;
+using glm::mat4, glm::vec3,
+	glm::translate, glm::normalize;
 
 map_camera::map_camera(float d) : theta{0}, phi{0}, distance{d}, look_at{0, 0} {}
 
@@ -32,4 +33,8 @@ void map_camera::update() {
 	};
 
 	_view = translate(V, -position);
+}
+
+vec3 map_camera::forward() const {
+	return normalize(-vec3{_view[2]});
 }

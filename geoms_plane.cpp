@@ -21,7 +21,7 @@ f: show/hide face normals */
 #include <glm/gtc/matrix_inverse.hpp>
 #include <spdlog/spdlog.h>
 #include "glmprint.hpp"
-#include "camera.h"
+#include "camera.hpp"
 #include "color.hpp"
 
 using std::vector, std::string, std::tuple, std::pair, std::byte;

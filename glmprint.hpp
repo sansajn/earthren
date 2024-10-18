@@ -16,8 +16,7 @@ TODO:
 
 
 template <typename Mat>
-void print(std::ostream & out, Mat const & M)
-{
+void print(std::ostream & out, Mat const & M) {
 	using std::vector;
 	using std::string;
 	using std::copy;
@@ -62,10 +61,9 @@ void print(std::ostream & out, Mat const & M)
 	out << "\n";
 }
 
-// generic matrix output operator
+//! Generic matrix output operator (meant to be used by labelers e.g. with_label{}).
 template<glm::length_t C, glm::length_t R, typename T, glm::qualifier Q = glm::defaultp>
-std::ostream & operator<<(std::ostream & out, glm::mat<C, R, T, Q> const & M)
-{
+std::ostream & operator<<(std::ostream & out, glm::mat<C, R, T, Q> const & M) {
 	print(out, M);
 	return out;
 }
@@ -76,8 +74,7 @@ mat4 M{1};
 cout << with_label("M", M);
 \endcode */
 template <typename Mat>
-struct with_label
-{
+struct with_label {
 	with_label(std::string const & label, Mat const & M) : _M{M}, _label{label} {}
 
 	Mat const & _M;
@@ -85,8 +82,7 @@ struct with_label
 };
 
 template <typename Mat>
-std::ostream & operator<<(std::ostream & out, with_label<Mat> const & x)
-{
+std::ostream & operator<<(std::ostream & out, with_label<Mat> const & x) {
 	if (!x._label.empty())
 		out << x._label << " =\n";
 
@@ -113,9 +109,13 @@ void print_matrix(M const & m, std::string const & name = std::string())
 	std::cout << "\n";
 }
 
+/*! Vector printer.
+\code
+vec3 v{1,2,3};
+print_vector(v, "v");
+\endcode */
 template <typename V>
-void print_vector(V const & v, std::string const & name = std::string())
-{
+void print_vector(V const & v, std::string const & name = std::string()) {
 	if (!name.empty())
 		std::cout << name << " =\n";
 

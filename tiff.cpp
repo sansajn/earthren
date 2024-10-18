@@ -1,15 +1,17 @@
 #include <fstream>
-#include <boost/gil.hpp>
-#include <tiffio.hxx>
+#include <limits>
 #include <cassert>
 #include <cstring>
+#include <boost/gil.hpp>
+#include <tiffio.hxx>
 #include "tiff.hpp"
 
 using std::tuple, std::byte,
 	std::unique_ptr,
 	std::filesystem::path,
 	std::ifstream,
-	std::move, std::swap;
+	std::move, std::swap,
+	std::numeric_limits;
 
 tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file) {
 	ifstream fin{tiff_file};
@@ -75,12 +77,10 @@ unique_ptr<byte> flip_copy(byte const * pixels, size_t w, size_t h, size_t image
 
 	unique_ptr<byte> flipped_pixels{new byte[image_size]};
 	copy_pixels(flipped_view, interleaved_view(w, h, (PixelType *)flipped_pixels.get(), w*sizeof(PixelType)));
-	return move(flipped_pixels);
+	return flipped_pixels;
 }
 
-
-// TODO: _exp find a bether name
-tuple<unique_ptr<byte>, tiff_data_desc> load_tiff_exp(path const & tiff_file, bool flip) {
+tuple<unique_ptr<byte>, tiff_data_desc> load_tiff_desc(path const & tiff_file, bool flip) {
 	ifstream fin{tiff_file};
 	assert(fin.is_open());
 
@@ -125,11 +125,15 @@ tuple<unique_ptr<byte>, tiff_data_desc> load_tiff_exp(path const & tiff_file, bo
 	TIFFClose(tiff);
 	fin.close();
 
+	assert(bits_per_sample/8 <= numeric_limits<uint8_t>::max());
+	assert(samples_per_pixel <= numeric_limits<uint8_t>::max());
+
 	tiff_data_desc const desc = {
 		.width=image_w,
 		.height=image_h,
-		.bytes_per_sample=bits_per_sample/8,  // TODO: deal with warning there
-		.samples_per_pixel=samples_per_pixel};
+		.bytes_per_sample=static_cast<uint8_t>(bits_per_sample/8),
+		.samples_per_pixel=static_cast<uint8_t>(samples_per_pixel)
+	};
 
 	if (flip) {
 		// TODO: thiis should be handle by a factory mmethod

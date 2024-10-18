@@ -25,7 +25,7 @@ i: print transformations info */
 #include <cassert>
 #include <cstddef>
 #include <csignal>
-#include <fmt/core.h>
+#include <fmt/core.h>  // replacement for std::format
 #include <boost/stacktrace.hpp>
 #include <string.h>  // for posix strsignal()
 #include <SDL.h>
@@ -37,7 +37,6 @@ i: print transformations info */
 #include <spdlog/spdlog.h>
 #include "imgui/imgui.h"
 #include "imgui/examples/imgui_impl_sdl.h"
-#include "imgui/examples/imgui_impl_opengl3.h"
 #include "glmprint.hpp"
 #include "camera.hpp"
 #include "color.hpp"
@@ -45,17 +44,22 @@ i: print transformations info */
 #include "texture.hpp"
 #include "shader.hpp"
 #include "io.hpp"
+#include "flat_shader.hpp"
+#include "four_terrain_ui.hpp"
+#include "axes_model.hpp"
+#include "quad.hpp"
+#include "four_terrain_shader_program.hpp"
 
-using std::vector, std::string, std::tuple, std::pair, std::byte;
+using std::vector, std::string, std::pair, std::byte;
+using std::tuple, std::get;
 using std::unique_ptr;
 using std::filesystem::path, std::ifstream;
 using std::cout, std::endl;
 using fmt::print;
 using std::chrono::steady_clock, std::chrono::duration_cast, 
 	std::chrono::milliseconds;
-using glm::mat4,
+using glm::mat4, glm::mat3,
 	glm::vec4, glm::vec3, glm::vec2,
-	glm::mat3,
 	glm::value_ptr,
 	glm::perspective,
 	glm::translate,
@@ -71,7 +75,7 @@ constexpr float TERRAIN_SIZE_SCALE = 2.0f;
 constexpr float TERRAIN_HEIGHT_SCALE = 10.0f;
 constexpr float elevation_pixel_size = 26.063200588611451;  // this is tile dependent, use gdalinfo to figure it out
 
-path const VERTEX_SHADER_FILE = "terrain_quad.vs",
+path const VERTEX_SHADER_FILE = "four_terrain.vs",
 	FRAGMENT_SHADER_FILE = "satellite_map.fs",
 	LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_GEOMETRY_SHADER_FILE = "to_line.gs",
@@ -82,22 +86,7 @@ path const VERTEX_SHADER_FILE = "terrain_quad.vs",
 path const HEIGHT_MAP_TEXTURE = "data/tile_1_1.tif";  // 16bit GRAY bitmap
 path const SATELLITE_MAP_TEXTURE = "data/tile_1_1_rgb.tif";  // 8bit RGB bitmap
 
-constexpr char const * config_file_name = "height_scale.ini";
-
-tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc);
-
-/*! Creates quad mesh on GPU with a size=1.
-\return (vao, vbo, vertex_count) tuple. */
-tuple<GLuint, GLuint, unsigned> create_mesh(GLint vertices_loc, GLint uv_loc);
-
-/*! Returns vector of data in a (position:3, texcoord:2) format per vertex and array of indices to form a model.
-To create a OpenGL object use code
-auto [vertices, indices] = make_quad(quad_w, quad_h);
-// ...
-glBufferData(GL_ARRAY_BUFFER, size(vertices)*sizeof(float), vertices.data(), GL_STATIC_DRAW);
-glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
-\endcoode */
-pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h);
+path const config_file_path = "four_terrain.ini";
 
 void verbose_signal_handler(int signal) {
 	cout << "signal '" << strsignal(signal) << "' (" << signal << ") caught\n"
@@ -122,11 +111,16 @@ struct input_mode {  // list of active input contol modes
 		move_right = false;  // d
 };
 
-// TODO: rename to map_events?
-struct input_events {  // TOOD: we want constructor to init all members to false
+struct input_events {
 	bool zoom_in;
 	bool camera_switch;
-	bool info_request;  // TODO: this can't be grouped as map_events, it behaves like an event but not map_event
+	bool info_request;
+
+	input_events() : zoom_in{false}, camera_switch{false}, info_request{false} {}
+
+	void reset() {
+		zoom_in = camera_switch = info_request = false;
+	}
 };
 
 struct render_features {  // list of selected rendering features
@@ -140,7 +134,7 @@ struct render_features {  // list of selected rendering features
 /*! Process user input.
 \returns false in case user want to quit, otherwise true. */
 template <typename Camera>
-bool process_user_events(Camera & cam, input_mode & mode, render_features & features,
+bool input(Camera & cam, input_mode & mode, render_features & features,
 	input_events & events);
 
 // input handling functions
@@ -151,8 +145,35 @@ void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & 
 void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
 	input_events & events);  //!< handle camera movement, rotations
 
-// TODO: maybe we want to also apply mouse movement there (based on app physics)
 void update(free_camera & cam, input_mode const & mode, float dt);
+
+bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
+	return get<1>(tile) == get<2>(tile);
+}
+
+/*! \returns list of (TID, width, height) tripet for for each terrain tile. */
+vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols);
+
+// three lines
+constexpr float axis_verts[] = {
+	0,0,0, 1,0,0,  // x
+	0,0,0, 0,1,0,  // y
+	0,0,0, 0,0,1  // z
+};
+
+GLuint push_data(void const * data, size_t size_in_bytes) {
+	// the implementation is not reusable, because we are creating a buffer and also unbins buffer after (this can be slow fo more bufffers).
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, size_in_bytes, data, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbind
+	return vbo;
+}
+
+GLuint push_axes() {
+	return push_data(axis_verts, sizeof(axis_verts));
+}
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
@@ -162,7 +183,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	path const height_map_path = (argc > 1) ? path{argv[1]} : HEIGHT_MAP_TEXTURE;
 
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
+	SDL_Window * window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -176,39 +197,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		<< "GL_RENDERER: " << glGetString(GL_RENDERER) << "\n"
 		<< "GLSL_VERSION: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
 	
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-
-	[[maybe_unused]] ImGuiIO & io = ImGui::GetIO();
-	io.IniFilename = config_file_name;
-	// we can configure ImGuiIO via io variable ...
-
-	ImGui::StyleColorsDark();
-
-	// Setup Platform/Renderer bindings
-	ImGui_ImplSDL2_InitForOpenGL(window, &context);
-	ImGui_ImplOpenGL3_Init();
+	four_terrain_ui ui;
+	ui.height_scale = TERRAIN_HEIGHT_SCALE;
+	ui.init(config_file_path);
+	ui.setup(window, context);
 
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 
-	// load shader program for terrain rendering
-	string const vertex_shader = read_file(VERTEX_SHADER_FILE),
-		fragment_shader = read_file(FRAGMENT_SHADER_FILE);
-
-	GLuint const shader_program = get_shader_program(vertex_shader.c_str(), fragment_shader.c_str());
-	GLint const position_loc = glGetAttribLocation(shader_program, "position");
-	GLint const local_to_screen_loc = glGetUniformLocation(shader_program, "local_to_screen");
-	GLint const heights_loc = glGetUniformLocation(shader_program, "heights");
-	GLint const satellite_map_loc = glGetUniformLocation(shader_program, "satellite_map");
-	GLint const height_map_size_loc = glGetUniformLocation(shader_program, "height_map_size");
-	GLint const height_scale_loc = glGetUniformLocation(shader_program, "height_scale");
-	GLint const eleveation_scale_loc = glGetUniformLocation(shader_program, "elevation_scale");
-	GLint const use_satellite_map_loc = glGetUniformLocation(shader_program, "use_satellite_map");
-	GLint const use_shading_loc = glGetUniformLocation(shader_program, "use_shading");
+	four_terrain_shader_program shader;
 
 	// load shader program to visualize light direction
 	string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
@@ -216,10 +215,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		lightdir_fs = read_file(LIGHTDIR_FRAGMENT_SHADER_FILE);
 
 	GLint const lightdir_shader_program = get_shader_program(lightdir_vs.c_str(), lightdir_fs.c_str(), lightdir_gs.c_str());
-
-	// TODO: position unused, should I use different VAO in case of new shader program?
-	GLint const lightdir_position_loc = glGetAttribLocation(lightdir_shader_program, "position");
-	assert(position_loc == lightdir_position_loc);  // TODO: this is temporary
+	assert(shader.position_location() == glGetAttribLocation(lightdir_shader_program, "position"));
 
 	GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
 	GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
@@ -233,10 +229,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		outline_fs = read_file(OUTLINE_FRAGMENT_SHADER_FILE);
 
 	GLint const outline_shader_program = get_shader_program(outline_vs.c_str(), outline_fs.c_str(), outline_gs.c_str());
-
-	// TODO: position unused, should I use different VAO in case of new shader program?
-	GLint const outline_position_loc = glGetAttribLocation(outline_shader_program, "position");
-	assert(position_loc == outline_position_loc);  // TODO: this is temporary
+	assert(shader.position_location() == glGetAttribLocation(outline_shader_program, "position"));
 
 	GLint const outline_heights_loc = glGetUniformLocation(outline_shader_program, "heights");
 	GLint const outline_height_map_size_loc = glGetUniformLocation(outline_shader_program, "height_map_size");
@@ -244,20 +237,31 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLint const outline_local_to_screen_loc = glGetUniformLocation(outline_shader_program, "local_to_screen");
 	GLint const outline_line_color_loc = glGetUniformLocation(outline_shader_program, "fill_color");
 
-	// load texture
-	// vector<GLuint> tiles = read_tiles();  // TODO: we only need first tile
-	auto const [height_map, texture_width, texture_height] = create_texture_16b(height_map_path);
-	assert(texture_width == texture_height);  // we are expecting square elevation tiles
+	string const flat_vs = read_file("flat_shader.vs"),
+		flat_fs = read_file("flat_shader.fs");
+	GLuint const flat_shader_program_id = get_shader_program(flat_vs.c_str(), flat_fs.c_str());
 
-	auto const [satellite_map, satellite_width, satellite_height] = create_texture_8b(SATELLITE_MAP_TEXTURE);
-	assert(satellite_width == satellite_height);  // we are expecting square elevation tiles
+	flat_shader_program flat_shader{flat_shader_program_id};
+
+	// load axes model
+	GLuint const axes_position_vbo = push_axes();
+	axes_model axes{axes_position_vbo};
+
+	// load textures
+	constexpr size_t grid_rows = 2,
+		grid_cols = 2;
+	assert((grid_rows % 2) == 0 && (grid_cols % 2) == 0);
+
+	vector<tuple<GLuint, size_t, size_t>> tiles = read_tiles(grid_rows, grid_cols);  // list of [elevation, satelite, ...] tiles for each terrain
+
+	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
 
 	// create terrain mash
 	constexpr float quad_size = 1.0f;
-	auto const [vao, vbo, ibo, element_count] = create_quad_mesh(position_loc);
+	auto const [vao, vbo, ibo, element_count] = create_quad_mesh(shader.position_location());
 
 	// camera related stuff
 	map_camera cam{20.0f};
@@ -267,7 +271,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	cam_detail.position = vec3{0, 0, 5.f};
 	cam_detail.look_at(vec3{0, 0, 0});
 
-	input_mode mode;  // TODO: we want either pan or rotate not both on the same time, simplify with enum-class
+	input_mode mode;
 
 	render_features features = {
 		.show_terrain = true,
@@ -277,7 +281,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		.calculate_shades = true
 	};
 
-	float height_scale = TERRAIN_HEIGHT_SCALE;
+	float const model_scale = TERRAIN_SIZE_SCALE;
 
 	auto t_prev = steady_clock::now();
 
@@ -292,7 +296,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		mat4 P, V;
 		if (!mode.detail_camera) {
 			// input
-			if (!process_user_events(cam, mode, features, events))
+			if (!input(cam, mode, features, events))
 				break;  // user wants to quit
 
 			// update
@@ -302,7 +306,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		}
 		else {  // free_camera
 			// input
-			if (!process_user_events(cam_detail, mode, features, events))
+			if (!input(cam_detail, mode, features, events))
 				break;  // user wants to quit
 
 			// update
@@ -314,132 +318,132 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		if (events.camera_switch)
 			cout << with_label{"V", V};
 
-		// TODO: we want GUI stuff to remove out of the loop
-
-		// create gui
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplSDL2_NewFrame(window);
-		ImGui::NewFrame();
-
-		ImGui::Begin("Options");  // begin window
-
-		ImGui::DragFloat("Height Scale", &height_scale, 0.1f, 1.0f, 20.0f);
-
-		ImGui::End();  // end window
-
-		ImGui::SetWindowFocus(nullptr);
+		ui.create();  // do we need to do this every frame?
 
 		// render
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);  // clear buffer
 
 		glBindVertexArray(vao);  // VAO is independent of used program
 
-		float const model_scale = TERRAIN_SIZE_SCALE;
-		vec2 const model_pos = vec2{-quad_size/2.0f, -quad_size/2.0f} * model_scale;
-		mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
-		mat4 const local_to_screen = P*V*M;
-
 		if (events.info_request) {
 			cout << "info:\n"
 				<< "model_scale=" << model_scale << '\n'
-				<< "model_pos=" << model_pos << '\n'
 				<< with_label{"V", V} << '\n'
-				<< with_label{"local_to_screen", local_to_screen} << '\n'
 				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << '\n';
 		}
 
+		auto const & first_elevation_tile = *begin(tiles);
+		size_t const texture_width = get<1>(first_elevation_tile);
+		size_t const texture_height = get<2>(first_elevation_tile);
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);
 		
-		// render terrain
-		if (features.show_terrain) {
-			glUseProgram(shader_program);
+		// draw tiles
+		for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
+			for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
+				size_t const tile_idx = 2 * (row*grid_cols + col);
+				GLuint const height_map = get<0>(tiles[tile_idx]),
+					satellite_map = get<0>(tiles[tile_idx+1]);
 
-			// bind height map texture
-			// GLuint const & tile = tiles[0];  // TODO: we do not need list of tiles, just a tile
-			glUniform1i(heights_loc, 0);  // set height map sampler to use texture unit 0
-			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
+				vec2 model_pos = vec2{col, -row} * quad_size * model_scale - vec2{grid_cols, 0} * quad_size*model_scale*0.5f;
+				mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
+				mat4 const local_to_screen = P*V*M;
 
-			if (features.show_satellite) {
-				glUniform1i(use_satellite_map_loc, 1);  // set use_satellite_map to true
-				glUniform1i(satellite_map_loc, 1);  // set satellite map sampler to use testure unit 1
-				glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
-				glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
-			}
-			else {
-				glUniform1i(use_satellite_map_loc, 0);  // just set use_satellite_map to false
-			}
+				// render terrain
+				if (features.show_terrain) {
+					shader.use();
 
-			if (features.calculate_shades) {
-				glUniform1i(use_shading_loc, 1);  // just set use_shading to true
-			}
-			else
-				glUniform1i(use_shading_loc, 0);  // just set use_shading to false
+					// bind height map texture
+					shader.heights(0);  // set height map sampler to use texture unit 0
+					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
 
-			glUniform2f(height_map_size_loc, texture_width, texture_height);
-			glUniform1f(height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
-			glUniform1f(eleveation_scale_loc, elevation_scale);  // TODO: can we set uniform before we use a program?
+					if (features.show_satellite) {
+						shader.use_satellite_map(true);
+						shader.satellite_map(1);  // set satellite map sampler to use texture unit 1
+						glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
+						glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
+					}
+					else
+						shader.use_satellite_map(false);
 
-			glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					if (features.calculate_shades)
+						shader.use_shading(true);
+					else
+						shader.use_shading(false);
 
-			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-		}
+					shader.height_map_size(vec2{texture_width, texture_height});
+					shader.height_scale(ui.height_scale);
+					shader.elevation_scale(elevation_scale);
+					shader.local_to_screen(local_to_screen);
 
-		// render light directions
-		if (features.show_lightdir) {
-			glUseProgram(lightdir_shader_program);
+					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				}
 
-			glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
+				// render light directions
+				if (features.show_lightdir) {
+					glUseProgram(lightdir_shader_program);
 
-			// bind height map
-			glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
-			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
+					glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
 
-			glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
-			glUniform1f(lightdir_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
-			glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					// bind height map
+					glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
+					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
-			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-		}
+					glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
+					glUniform1f(lightdir_height_scale_loc, ui.height_scale);
+					glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
-		// render triangle outlines
-		if (features.show_outline) {
-			glUseProgram(outline_shader_program);
+					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				}
 
-			glUniform3fv(outline_line_color_loc, 1, value_ptr(rgb::blue));
+				// render triangle outlines
+				if (features.show_outline) {
+					glUseProgram(outline_shader_program);
 
-			// bind height map
-			glUniform1i(outline_heights_loc, 0);  // set sampler s to use texture unit 0
-			glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-			glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
+					glUniform3fv(outline_line_color_loc, 1, value_ptr(rgb::blue));
 
-			glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
-			glUniform1f(outline_height_scale_loc, height_scale);  // TODO: can we set uniform before we use a program?
-			glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+					// bind height map
+					glUniform1i(outline_heights_loc, 0);  // set sampler s to use texture unit 0
+					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
 
-			glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-		}
+					glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
+					glUniform1f(outline_height_scale_loc, ui.height_scale);
+					glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+
+					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				}
+			}  // for (col ...
+		}  // for (row ...
 
 		glBindVertexArray(0);  // unbind VAO
 
-		ImGui::Render();  // render ImGui
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		flat_shader.use();  // render axis there
+
+		// we want to put axes to the left bottom corner in a camera space (so the position never change, just the rotation)
+		mat4 const cam_rot = mat4{glm::mat3{V}};
+
+		// T*S*R
+		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25,-2.45,-5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
+			axes_local_to_screen = P*M_axes*cam_rot;  //=P*V*V'*M_axes
+
+		axes.draw(flat_shader, axes_local_to_screen);
+
+		ui.render();
 
 		SDL_GL_SwapWindow(window);
 	}
 	
-	// for(auto tile : tiles)  // delete textures
-		// glDeleteTextures(1, &tile);
+	for(auto tile : tiles)  // delete textures
+		glDeleteTextures(1, &get<0>(tile));
 
 	glDeleteBuffers(1, &ibo);
 	glDeleteBuffers(1, &vbo);
 	glDeleteVertexArrays(1, &vao);
-	glDeleteProgram(shader_program);
+	// glDeleteProgram(shader_program);
 
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplSDL2_Shutdown();
-	ImGui::DestroyContext();
+	ui.shutdown();
 
 	SDL_GL_DeleteContext(context);
 	SDL_DestroyWindow(window);
@@ -598,7 +602,7 @@ void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & 
 void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
 	[[maybe_unused]] input_events & events) {
 
-	constexpr float dt = 0.1f;  // TODO: this should be function argument
+	constexpr float dt = 0.1f;
 	constexpr float angular_speed = 1.0f/100.0f;  // rad/s
 
 	// handle mouse movement when ctrl is pressed to rotate camera
@@ -625,14 +629,10 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 }
 
 template <typename Camera>
-bool process_user_events(Camera & cam, input_mode & mode, render_features & features,
-	input_events & events) {  // TODO: rename to input()
+bool input(Camera & cam, input_mode & mode, render_features & features,
+	input_events & events) {
 
-	events = {  // resets all input events
-		.zoom_in = false,
-		.camera_switch = false,
-		.info_request = false
-	};
+	events.reset();
 
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {  // we want to fully process the event queue, update state and then render
@@ -659,7 +659,7 @@ bool process_user_events(Camera & cam, input_mode & mode, render_features & feat
 }
 
 void update(free_camera & cam, input_mode const & mode, float dt) {
-	constexpr float speed = 1.0f;  // TODO: not velocity?
+	constexpr float speed = 1.0f;
 
 	// update cam position based on mode
 	if (mode.move_forward)
@@ -677,73 +677,21 @@ void update(free_camera & cam, input_mode const & mode, float dt) {
 	cam.update();  // update camera
 }
 
-pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
-	assert(w > 1 && h > 1 && "invalid dimensions");
+vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols) {
+	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
+	for (size_t row = 0; row < grid_rows; ++row) {
+		for (size_t col = 0; col < grid_cols; ++col) {
+			string const height_tile_name = fmt::format("learn/tiles_utm/tile_{}_{}.tif", col+1, row+1);
 
-	// vertices
-	float const dx = 1.0f/(w-1),
-		dy = 1.0f/(h-1);
-	vector<float> verts((3+2+3)*w*h);  // position:3, texcoord:2
+			auto const height_tile = create_texture_16b(height_tile_name);
+			assert(is_square(height_tile));
+			tiles.push_back(height_tile);
 
-	float * vdata = verts.data();
-	for (unsigned j = 0; j < h; ++j) {
-		float py = j*dy;
-		for (unsigned i = 0; i < w; ++i) {
-			float px = i*dx;
-			*vdata++ = px;  // position
-			*vdata++ = py;
-			*vdata++ = 0;
-			*vdata++ = px;  // texcoord
-			*vdata++ = py;
+			string const satellite_tile_name = fmt::format("learn/fourtiles/tile_{}_{}.tif", col+1, row+1);
+			auto const satellite_tile = create_texture_8b(satellite_tile_name);
+			assert(is_square(satellite_tile));
+			tiles.push_back(satellite_tile);
 		}
 	}
-
-	// indices
-	unsigned const nindices = 2*(w-1)*(h-1)*3;
-	vector<unsigned> indices(nindices);
-	unsigned * idata = indices.data();
-	for (unsigned j = 0; j < h-1; ++j) {
-		unsigned yoffset = j*w;
-		for (unsigned i = 0; i < w-1; ++i) {
-			unsigned n = i + yoffset;
-			*(idata++) = n;
-			*(idata++) = n+1;
-			*(idata++) = n+1+w;
-			*(idata++) = n+1+w;
-			*(idata++) = n+w;
-			*(idata++) = n;
-		}
-	}
-
-	return {verts, indices};
-}
-
-tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
-	constexpr unsigned quad_w = 100,
-		quad_h = 100;
-
-	auto [vertices, indices] = make_quad(quad_w, quad_h);
-
-	GLuint vao = 0;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	GLuint vbo = 0;  // create vertex bufffer object
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, size(vertices)*sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
-	GLuint ibo = 0;  // create index bufffer object
-	glGenBuffers(1, &ibo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, size(indices)*sizeof(unsigned), indices.data(), GL_STATIC_DRAW);
-
-	// bind (x,y,z) data
-	constexpr size_t stride = (3+2)*sizeof(float);
-	glVertexAttribPointer(position_loc, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)0);
-	glEnableVertexAttribArray(position_loc);
-
-	glBindVertexArray(0);  // unbind vertex array
-
-	return {vao, vbo, ibo, size(indices)};
+	return tiles;
 }

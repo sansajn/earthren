@@ -6,7 +6,7 @@ using std::cout, std::endl;  // TODO: we want to switch to spdlog
 
 
 // TODO: rewrite to string_view, glShaderSource call needs to be changed
-GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source, char const * geometry_shader_source) {
+GLuint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source, char const * geometry_shader_source) {
 	enum Consts {INFOLOG_LEN = 512};
 	GLchar infoLog[INFOLOG_LEN];
 	GLint success;
@@ -51,7 +51,7 @@ GLint get_shader_program(char const * vertex_shader_source, char const * fragmen
 	}
 
 	/* Link shaders */
-	GLint shader_program;
+	GLuint shader_program;
 	shader_program = glCreateProgram();
 	glAttachShader(shader_program, vertex_shader);
 	glAttachShader(shader_program, fragment_shader);

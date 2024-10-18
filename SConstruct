@@ -67,8 +67,16 @@ def build():
 		'imgui/examples/imgui_impl_opengl3.cpp',  # backend for opengl es3
 	])
 
-	env.Program(['height_scale.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp',
-		'tiff.cpp', 'io.cpp',  imgui])
+	height_scale_common = ['camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp',
+		'tiff.cpp', 'io.cpp']
+
+	env.Program(['height_scale.cpp', height_scale_common, imgui])
+
+	# four terrain sample
+	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
+		'axes_model.cpp', 'four_terrain_ui.cpp', 'four_terrain_shader_program.cpp',
+		'set_uniform.cpp', imgui])
+
 
 def configure(env, dependency_list):
 	conf = env.Configure(
