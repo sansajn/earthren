@@ -1,5 +1,5 @@
 # About
-Bunch of earth rendering and samples to create a program capable to render earth surface based on satelite data.
+Bunch of earth rendering samples to create a program capable to render earth surface based on satellite data.
 
 # How to build
 > **note**: We expect *Ubuntu 22.04 LTS* as operating system.
@@ -45,7 +45,34 @@ base                  *  /home/ja/miniconda3
 earthren                 /home/ja/miniconda3/envs/earthren
 ```
 
+## Data management
+Our samples can require huge amount data to work (e.g. elevation, satellite tiles) and we do not want push new data for each sample. We want to reuse data, therefore we
+- use LFS to manage binary data
+- we use scripts to generate data for specific sample (see `script/*_data` files)
+
+E.g. to prepare Plzen area data (used by `terrain_mesh`, `height_overlap` or `four_terrain` samples) we have `prepare_plzen` script which would create `plzen_elev.tif` and `plzen_rgb.tif` into `data` directory. Then e.g. `height_overlap_data` script which use Plzen area data and generates tiles for `height_overlap` sample in `data/gen` directory.
+
 # Samples
+
+## `terrain_mesh`
+Renders 4 terrains next to each other without tile edges issue (elevation and satellite) as in a previous `four_terrain` sample.
+
+![](docasset/terrain_mesh.jpg)
+
+This sample use the same data as `height_overlap` sample so to generate data
+- go to `script` directory
+- run `prepare_plzen` to generate Plzen area tiles and then
+- run `height_overlap_data` to generate sample tiles into `data/gen/four_terrain`
+
+## `height_overlap`
+The sample shows how to get rid of elevation tile edge height issue from `four_terrain` sample.
+
+![](docasset/height_overlap.jpg)
+
+To generate data for the sample
+- go to `script` directory
+- run `prepare_plzen` to generate Plzen area tiles and then
+- run `height_overlap_data` to generate sample tiles into `data/gen/four_terrain`
 
 ## `four_terrain`
 Renders 4 terrains next to each other. Sample based on `height_scale` sample
