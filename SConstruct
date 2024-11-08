@@ -33,7 +33,7 @@ def build():
 		('libtiff-4', '>= 4.3.0'),  # libtiff-dev
 		('spdlog', '>= 1.9.2'),  # libspdlog-dev
 		('fmt', '>= 6.1.2')  # libfmt-dev
-		# Boost.GIL
+		# libboost-dev (Boost.GIL, ...)
 	]
 
 	env = cpp20_env.Clone()
@@ -76,6 +76,19 @@ def build():
 	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
 		'axes_model.cpp', 'four_terrain_ui.cpp', 'four_terrain_shader_program.cpp',
 		'set_uniform.cpp', imgui])
+
+	# height overlap sample
+	env.Program(['height_overlap.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
+		'axes_model.cpp', 'four_terrain_ui.cpp', 'height_overlap_shader_program.cpp',
+		'set_uniform.cpp', imgui])
+
+	# terrain mesh sample
+	env.Program(['terrain_mesh.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
+		'axes_model.cpp', 'four_terrain_ui.cpp', 'height_overlap_shader_program.cpp',
+		'set_uniform.cpp', imgui])
+
+	# tile_grid
+	env.Program(['tile_grid.cpp'])
 
 
 def configure(env, dependency_list):

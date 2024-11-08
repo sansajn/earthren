@@ -1,9 +1,13 @@
 #include <spdlog/spdlog.h>
+#include <glm/vec4.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include "tiff.hpp"
 #include "texture.hpp"
+#include "color.hpp"
 
 using std::tuple;
 using std::filesystem::path;
+using glm::vec4, glm::value_ptr;
 
 bool is_tiff(path const & fname) {
 	return (fname.extension() == ".tiff") || (fname.extension() == ".tif");
@@ -43,7 +47,6 @@ tuple<GLuint, size_t, size_t> create_texture_16b(path const & fname) {
 	else  // TODO: provide info about channels
 		throw std::runtime_error{"unsupported number of channels (?), only GRAY and RGB images are supported"};
 
-
 	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
 
 	return {tbo, image_desc.width, image_desc.height};
@@ -70,19 +73,20 @@ tuple<GLuint, size_t, size_t> create_texture_8b(path const & fname) {
 	glGenTextures(1, &tbo);
 	glBindTexture(GL_TEXTURE_2D, tbo);
 
-	// note: 16bit I/UI textures can not be interpolated and so filter needs to be set to GL_NEAREST
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);  // or GL_NEAREST
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// clam to the edge outside of [0,1]^2 range
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	// TODO:  this is inefficient, we want to get rid of that
+	// TODO: this is inefficient, we want to get rid of that ALIGNMENT
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);  // tell OpenGL to change aligment from 4 to 1 to read RGB textures
 
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, image_desc.width, image_desc.height);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image_desc.width, image_desc.height, GL_RGB, GL_UNSIGNED_BYTE, image_data.get());
+
+	// in case of wrapping, we want to be able to easilly see it in scene as red color
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, value_ptr(vec4{rgb::red, 1.0}));
+
+	// set texture filtering (interpolation) mode (if GL_LINEAR is set, we can see artifacts in a scene)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
 

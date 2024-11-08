@@ -105,7 +105,7 @@ tuple<unique_ptr<byte>, tiff_data_desc> load_tiff_desc(path const & tiff_file, b
 
 	uint16_t sample_format = 0;
 	TIFFGetField(tiff, TIFFTAG_SAMPLEFORMAT, &sample_format);
-	assert(sample_format == SAMPLEFORMAT_UINT || sample_format == SAMPLEFORMAT_INT);
+	assert(sample_format == SAMPLEFORMAT_UINT || sample_format == SAMPLEFORMAT_INT);  // expecting int/uint samples
 
 	uint16_t samples_per_pixel = 0;
 	TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);

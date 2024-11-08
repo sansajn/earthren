@@ -1,3 +1,5 @@
+> TODO: there is new way to set environemnt, see script/setup_conda_env
+
 Create earthren-learn environemnt with
 
 ```bash

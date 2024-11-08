@@ -1,7 +1,7 @@
 #version 320 es
 
 /* Geometry shader program to transform triangles into triangle outline. The program can be used
-to visualize triangle outline for a debug purpose. */
+to draw wireframe for a mesh (of triangles). */
 
 layout(triangles) in;
 layout(line_strip, max_vertices = 4) out;

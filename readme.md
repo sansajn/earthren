@@ -2,13 +2,13 @@
 Bunch of earth rendering and samples to create a program capable to render earth surface based on satelite data.
 
 # How to build
-
 > **note**: We expect *Ubuntu 22.04 LTS* as operating system.
 
-Install dependencies with
 ```bash
-sudo apt install libtiff-dev libmagick++-dev libtiff-dev
+sudo apt install libmagick++-dev libtiff-dev libglm-dev libsdl2-dev libspdlog-dev libfmt-dev libboost-dev
 ```
+> **tip**: up-to-date list of dependencies can be seen in `SConstruct` file as `deps` variable
+
 command and build with
 ```bash
 scons -j8
@@ -19,11 +19,69 @@ scons -j8 SAMPLE-NAME
 ```
 command (e.g. `scons -j8 height_sinxy`).
 
+# Datasets
+Samples needs data to get them working and we have bunch of python/bash scripts to generate that data.
+
+To create an environment with all dependencies run
+```bash
+cd script
+./setup_conda_env
+```
+## Manual setup
+- create *earthren* python environment to get scripts working with
+```bash
+cd script
+conda env create -f environment.yml
+```
+commands.
+> we expect *conda* is installed see [[Python tips#3-2) Inštalácia?]]
+
+- (optional) check *earthren* environment created with
+```console
+$ conda env list                                                
+# conda environments:                                                            
+#                                                                                
+base                  *  /home/ja/miniconda3                                     
+earthren                 /home/ja/miniconda3/envs/earthren
+```
+
 # Samples
+
+## `four_terrain`
+Renders 4 terrains next to each other. Sample based on `height_scale` sample
+
+![](docasset/four_terrain.jpg)
+Figure: `four_terrain` sample screenshot.
+
+What is new:
+- `axes_model`, `flat_shader` introduced
+- `set_uniform` introduced
+
+## `height_scale`
+Shows how to integrate GUI to play with height scale values during terrain rendering.  Based on `satellite_map` example.
+
+![](docasset/height_scale.jpg)
+Figure: `height_scale` sample screenshot.
+
+What is new:
+- GUI used
+
+## `satellite_map`
+
+Sample shows how to apply satellite imagery (Landsat 8 mission) to a terrain (see `terrain_quad` sample).
+
+We have managed to flip satellite texture (we still needs to flip elevation map). The resulting render doesn't realistic due to height scale constant set to 10.0, see ![](docasset/satellite_map.jpg) Figure: Current `satellite_map` sample result.
+
+What is new:
+- satellite imagery as a terrain texture
+- elevation and satellite textures are flipped
+
+## `terrain_quad`
+...
 
 ## `height_map`
 `Height_map` sample shows how to render terrain based on height map texture (*TIFF* file). 
-![[height_map.png]]
+![](docasset/height_map.png)
 
 The sample is based on previous [[#`height_sinxy_normals`]] sample code. There is just one quad in scene and also XY axis are not scaled and Z (heights) is scaled by a factor of $100$.
 
@@ -41,8 +99,8 @@ What is new:
 - free-camera implementation
 
 ## `geoms_plane`
-Visualization of normals for a plane. We found a workaround for [[#`gs_triangle_broken`]] issue so there are not any visible artifacts anymore.
-![[geoms_plane.png]]
+Visualization of normals for a plane. We found a workaround for `gs_triangle_broken` issue so there are not any visible artifacts anymore.
+![](docasset/geoms_plane.png)
 
 What is new:
 - unified `to_line_v0.gs` shader program
@@ -53,14 +111,14 @@ We later found that this workaround is not always working (outline visualization
 ## `gs_triangle_broken`
 
 The sample show geometry shader program artifacts for a simple quad with a camera, see
-![[gs_artifact_sample.png]]
+![](docasset/gs_artifact_sample.png)
 **Figure**: Artifacts while rendering normals in geometry shader program.
 
 This issue affects all samples using geometry shader (normals, height_map, ...).
 
 ## `normals`
 
-`Normals` sample shown how to visualize computed normals. It is based on [[#`height_sinxy_normals`]] sample.
+`Normals` sample shown how to visualize computed normals. It is based on `height_sinxy_normals` sample.
 
 ![](docasset/normals.png)
 

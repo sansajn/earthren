@@ -1,0 +1,4 @@
+#!/bin/bash
+# Creates python earthren (conda) environment to execute python scripts.
+
+conda env create -f environment.yml

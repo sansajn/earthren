@@ -1,0 +1,12 @@
+name: earthren
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12
+  - pip
+  - matplotlib
+  - numpy
+  - rasterio
+  - gdal=3.8.4

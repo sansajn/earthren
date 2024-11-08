@@ -48,12 +48,13 @@ i: print transformations info */
 #include "four_terrain_ui.hpp"
 #include "axes_model.hpp"
 #include "quad.hpp"
-#include "four_terrain_shader_program.hpp"
+#include "height_overlap_shader_program.hpp"
 
-using std::vector, std::string, std::pair, std::byte;
+using std::vector, std::string, std::pair, std::byte, std::size;
 using std::tuple, std::get;
 using std::unique_ptr;
-using std::filesystem::path, std::ifstream;
+using std::filesystem::path, std::filesystem::exists;
+using std::ifstream;
 using std::cout, std::endl;
 using fmt::print;
 using std::chrono::steady_clock, std::chrono::duration_cast, 
@@ -75,18 +76,16 @@ constexpr float TERRAIN_SIZE_SCALE = 2.0f;
 constexpr float TERRAIN_HEIGHT_SCALE = 10.0f;
 constexpr float elevation_pixel_size = 26.063200588611451;  // this is tile dependent, use gdalinfo to figure it out
 
-path const VERTEX_SHADER_FILE = "four_terrain.vs",
-	FRAGMENT_SHADER_FILE = "satellite_map.fs",
-	LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
+path const LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_GEOMETRY_SHADER_FILE = "to_line.gs",
 	LIGHTDIR_FRAGMENT_SHADER_FILE = "colored.fs",
-	OUTLINE_VERTEX_SHADER_FILE = "height_map_outline.vs",
+	OUTLINE_VERTEX_SHADER_FILE = "height_overlap_outline.vs",
 	OUTLINE_GEOMETRY_SHADER_FILE = "to_outline.gs",
 	OUTLINE_FRAGMENT_SHADER_FILE = "colored.fs";
 
-path const config_file_path = "four_terrain.ini";
+path const config_file_path = "terrain_mesh.ini";
 
-path const data_path = "data/gen/four_terrain";
+path const data_path = "data/gen/height_overlap";
 constexpr string elevation_tile_prefix = "plzen_elev_",
 	satellite_tile_prefix = "plzen_rgb_";
 
@@ -149,6 +148,28 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 
 void update(free_camera & cam, input_mode const & mode, float dt);
 
+// Draw helpers
+
+//! Draws terrain quad with elevations and sattelite texture.
+void draw_terrain(height_overlap_shader_program & shader,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	mat4 const & local_to_screen,
+	GLuint elevation_map, size_t elevation_width, size_t elevation_height,
+	GLuint satellite_map,
+	float height_scale, float elevation_scale,
+	render_features const & features);
+
+//! Draws terrain quad as mesh.
+void draw_terrain_outlines(GLint shader,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	vec3 color, GLint line_color_loc,
+	GLint heights_loc, GLuint height_map,
+	float height_scale, GLint height_scale_loc,
+	float elevation_scale, float elevation_scale_loc,
+	mat4 local_to_screen, GLint local_to_screen_loc,
+	render_features const & features);
+
+
 bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
 	return get<1>(tile) == get<2>(tile);
 }
@@ -182,9 +203,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
 
 	// process arguments
+	string const title = string{path{argv[0]}.stem()} + " (OpenGL ES 3.2)"s;
 
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window * window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED,
+	SDL_Window * window = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -208,7 +230,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 
-	four_terrain_shader_program shader;
+	height_overlap_shader_program shader;
 
 	// load shader program to visualize light direction
 	string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
@@ -233,7 +255,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	assert(shader.position_location() == glGetAttribLocation(outline_shader_program, "position"));
 
 	GLint const outline_heights_loc = glGetUniformLocation(outline_shader_program, "heights");
-	GLint const outline_height_map_size_loc = glGetUniformLocation(outline_shader_program, "height_map_size");
+	GLint const outline_elevation_scale_loc = glGetUniformLocation(outline_shader_program, "elevation_scale");
 	GLint const outline_height_scale_loc = glGetUniformLocation(outline_shader_program, "height_scale");
 	GLint const outline_local_to_screen_loc = glGetUniformLocation(outline_shader_program, "local_to_screen");
 	GLint const outline_line_color_loc = glGetUniformLocation(outline_shader_program, "fill_color");
@@ -333,11 +355,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << '\n';
 		}
 
+		assert(size(tiles) > 2 && "we expect at least one elevation and one satellite tiles");
+
 		auto const & first_elevation_tile = *begin(tiles);
 		size_t const texture_width = get<1>(first_elevation_tile);
 		size_t const texture_height = get<2>(first_elevation_tile);
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);
-		
+
 		// draw tiles
 		for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
 			for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
@@ -349,35 +373,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 				mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 				mat4 const local_to_screen = P*V*M;
 
-				// render terrain
-				if (features.show_terrain) {
-					shader.use();
-
-					// bind height map texture
-					shader.heights(0);  // set height map sampler to use texture unit 0
-					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
-
-					if (features.show_satellite) {
-						shader.use_satellite_map(true);
-						shader.satellite_map(1);  // set satellite map sampler to use texture unit 1
-						glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
-						glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
-					}
-					else
-						shader.use_satellite_map(false);
-
-					if (features.calculate_shades)
-						shader.use_shading(true);
-					else
-						shader.use_shading(false);
-
-					shader.height_map_size(vec2{texture_width, texture_height});
-					shader.height_scale(ui.height_scale);
-					shader.elevation_scale(elevation_scale);
-					shader.local_to_screen(local_to_screen);
-
-					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				if (features.show_terrain) {  // render terrain
+					draw_terrain(shader,
+						element_count,
+						local_to_screen,
+						height_map, texture_width, texture_height,
+						satellite_map,
+						ui.height_scale, elevation_scale, features);
 				}
 
 				// render light directions
@@ -398,22 +400,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 				}
 
-				// render triangle outlines
-				if (features.show_outline) {
-					glUseProgram(outline_shader_program);
-
-					glUniform3fv(outline_line_color_loc, 1, value_ptr(rgb::blue));
-
-					// bind height map
-					glUniform1i(outline_heights_loc, 0);  // set sampler s to use texture unit 0
-					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
-
-					glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
-					glUniform1f(outline_height_scale_loc, ui.height_scale);
-					glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
-
-					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+				if (features.show_outline) {  // render wireframe
+					draw_terrain_outlines(outline_shader_program,
+						element_count,
+						rgb::blue, outline_line_color_loc,
+						outline_heights_loc, height_map,
+						ui.height_scale, outline_height_scale_loc,
+						elevation_scale, outline_elevation_scale_loc,
+						local_to_screen, outline_local_to_screen_loc,
+						features);
 				}
 			}  // for (col ...
 		}  // for (row ...
@@ -442,7 +437,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glDeleteBuffers(1, &ibo);
 	glDeleteBuffers(1, &vbo);
 	glDeleteVertexArrays(1, &vao);
-	// glDeleteProgram(shader_program);
 
 	ui.shutdown();
 
@@ -451,6 +445,77 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	SDL_Quit();
 	
 	return 0;
+}
+
+// TODO: this is ugly solution, too many arguments there
+void draw_terrain(height_overlap_shader_program & shader,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	mat4 const & local_to_screen,
+	GLuint elevation_map, size_t elevation_width, size_t elevation_height,  // TODO: we only need size not w and h
+	GLuint satellite_map,
+	float height_scale, float elevation_scale,
+	render_features const & features) {
+
+	shader.use();
+
+	// bind height map texture
+	shader.heights(0);  // set height map sampler to use texture unit 0
+	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+	glBindTexture(GL_TEXTURE_2D, elevation_map);  // bind a height texture to active texture unit (0)
+
+	if (features.show_satellite) {
+		shader.use_satellite_map(true);
+		shader.satellite_map(1);  // set satellite map sampler to use texture unit 1
+		glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
+		glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
+	}
+	else
+		shader.use_satellite_map(false);
+
+	if (features.calculate_shades)
+		shader.use_shading(true);
+	else
+		shader.use_shading(false);
+
+	constexpr float elevation_tile_pixel_size = 26.063200588611451;  // see gdalinfo
+
+	assert(elevation_width == elevation_height && "we expect square elevation tiles");
+	shader.terrain_size(elevation_width * elevation_tile_pixel_size);
+	shader.elevation_tile_size(elevation_width);
+	shader.normal_tile_size(elevation_width - 4);  // 2px border
+	shader.height_scale(height_scale);
+	shader.elevation_scale(elevation_scale);
+	shader.local_to_screen(local_to_screen);
+
+	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+}
+
+void draw_terrain_outlines(GLint shader,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	vec3 color, GLint line_color_loc,
+	GLint heights_loc, GLuint height_map,
+	float height_scale, GLint height_scale_loc,
+	float elevation_scale, float elevation_scale_loc,
+	mat4 local_to_screen, GLint local_to_screen_loc,
+	render_features const & features) {
+
+	// render triangle outlines
+	if (features.show_outline) {
+		glUseProgram(shader);
+
+		glUniform3fv(line_color_loc, 1, value_ptr(color));
+
+		// bind height map
+		glUniform1i(heights_loc, 0);  // set sampler s to use texture unit 0
+		glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+		glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
+
+		glUniform1f(elevation_scale_loc, elevation_scale);
+		glUniform1f(height_scale_loc, height_scale);
+		glUniformMatrix4fv(local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+
+		glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+	}
 }
 
 // handling render features
@@ -683,12 +748,15 @@ vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_c
 	for (size_t row = 0; row < grid_rows; ++row) {
 		for (size_t col = 0; col < grid_cols; ++col) {
 			string const height_tile_name = fmt::format("{}/{}{}_{}.tif", data_path.c_str(), elevation_tile_prefix, col, row);
+			assert(exists(height_tile_name) && "elevation tile not found");
 
 			auto const height_tile = create_texture_16b(height_tile_name);
 			assert(is_square(height_tile));
 			tiles.push_back(height_tile);
 
 			string const satellite_tile_name = fmt::format("{}/{}{}_{}.tif", data_path.c_str(), satellite_tile_prefix, col, row);
+			assert(exists(satellite_tile_name) && "satellite tile not found");
+
 			auto const satellite_tile = create_texture_8b(satellite_tile_name);
 			assert(is_square(satellite_tile));
 			tiles.push_back(satellite_tile);

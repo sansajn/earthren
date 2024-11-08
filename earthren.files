@@ -35,6 +35,12 @@ height_map.vs
 height_map_lightdir.vs
 height_map_normal.vs
 height_map_outline.vs
+height_overlap.cpp
+height_overlap.fs
+height_overlap.vs
+height_overlap_outline.vs
+height_overlap_shader_program.cpp
+height_overlap_shader_program.hpp
 height_scale.cpp
 height_sinxy.cpp
 height_sinxy_map.cpp
@@ -226,11 +232,13 @@ set_uniform.hpp
 shader.cpp
 shader.hpp
 sinxy_heights.cpp
+terrain_mesh.cpp
 texture.cpp
 texture.hpp
 texture_storage.cpp
 tiff.cpp
 tiff.hpp
+tile_grid.cpp
 to_line.gs
 to_line_v0.gs
 to_normal.gs

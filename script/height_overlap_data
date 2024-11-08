@@ -1,0 +1,28 @@
+#!/bin/bash
+# Script to generate data for `height_overlap` sample
+
+# exit after firts error
+set -e
+
+TARGET_PATH="../data/gen/height_overlap"
+
+# Source the Conda initialization script
+source "$(conda info --base)/etc/profile.d/conda.sh"
+
+conda activate earthren
+
+echo "--> generate elevation tiles"
+python3 split_half_overlap.py ../data/plzen_elev.tif
+
+echo "--> generate satellite tiles"
+python3 split_half.py ../data/plzen_rgb.tif
+
+echo "--> install"
+mkdir -p $TARGET_PATH
+mv ./out/plzen_*.tif $TARGET_PATH
+echo "installed to $TARGET_PATH"
+
+echo "--> clean"
+rm -r ./out
+
+echo "done!"

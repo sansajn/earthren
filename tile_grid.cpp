@@ -11,6 +11,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <Magick++.h>
+#include "color.hpp"
 
 
 using std::vector, std::string;
@@ -19,7 +20,7 @@ using fmt::print;
 using std::chrono::steady_clock, std::chrono::duration_cast, 
 	std::chrono::milliseconds;
 using glm::mat4, 
-	glm::vec3, glm::vec2,
+	glm::vec4, glm::vec3, glm::vec2,
 	glm::value_ptr,
 	glm::perspective,
 	glm::translate,
@@ -49,7 +50,7 @@ out vec4 frag_color;
 uniform vec3 color;
 uniform sampler2D s;
 void main() {
-	frag_color = mix(texture(s, tex_coord), vec4(color, 1.0), 0.15);
+	frag_color = texture(s, tex_coord);
 })";
 
 GLfloat const xy_plane_verts[] = {
@@ -297,6 +298,16 @@ GLuint create_texture(std::string const & fname) {
 	glBindTexture(GL_TEXTURE_2D, tbo);
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
+
+	// in case of wrapping, we want to be able to see it in scene as red color
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, value_ptr(vec4{rgb::red, 1.0}));
+
+	// set texture filtering (interpolation) mode (if GL_LINEAR is set, we can see artifacts in a scene)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
 	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
 
 	return tbo;

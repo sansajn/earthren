@@ -8,6 +8,7 @@ earthren.creator.user
 
 learn/tiles/
 learn/tiles_utm/
+learn/out
 
 xy_plane
 xy_plane_grid
@@ -33,3 +34,6 @@ height_scale
 height_scale.ini
 four_terrain
 four_terrain.ini
+height_overlap
+tile_grid
+terrain_mesh
