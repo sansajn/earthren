@@ -233,6 +233,9 @@ shader.cpp
 shader.hpp
 sinxy_heights.cpp
 terrain_mesh.cpp
+terrain_scale.cpp
+terrain_scale_ui.cpp
+terrain_scale_ui.hpp
 texture.cpp
 texture.hpp
 texture_storage.cpp

@@ -35,5 +35,9 @@ height_scale.ini
 four_terrain
 four_terrain.ini
 height_overlap
+height_overlap.ini
 tile_grid
 terrain_mesh
+terrain_mesh.ini
+terrain_scale
+terrain_scale.ini

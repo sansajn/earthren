@@ -54,11 +54,8 @@ pair<vector<float>, vector<unsigned>> make_quad(unsigned w, unsigned h) {
 	return {verts, indices};
 }
 
-tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
-	constexpr unsigned quad_w = 100,
-		quad_h = 100;
-
-	auto [vertices, indices] = make_quad(quad_w, quad_h);
+tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc, unsigned n) {
+	auto const [vertices, indices] = make_quad(n, n);
 
 	GLuint vao = 0;
 	glGenVertexArrays(1, &vao);
@@ -82,4 +79,10 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_quad_mesh(GLint position_loc) {
 	glBindVertexArray(0);  // unbind vertex array
 
 	return {vao, vbo, ibo, size(indices)};
+}
+
+void destroy_quad_mesh(GLuint vao, GLuint vbo, GLuint ibo) {
+	glDeleteBuffers(1, &ibo);
+	glDeleteBuffers(1, &vbo);
+	glDeleteVertexArrays(1, &vao);
 }

@@ -90,6 +90,12 @@ def build():
 	# tile_grid
 	env.Program(['tile_grid.cpp'])
 
+	# terrain mesh sample
+	env.Program(['terrain_scale.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
+		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
+		'set_uniform.cpp', imgui])
+
+	# other samples ...
 
 def configure(env, dependency_list):
 	conf = env.Configure(
