@@ -4,10 +4,13 @@
 # exit after firts error
 set -e
 
-# Source the Conda initialization script
-source "$(conda info --base)/etc/profile.d/conda.sh"
-
-conda activate earthren
+# if conda available activate earthren environment
+if command -v conda >/dev/null 2>&1; then
+	# Source the Conda initialization script
+	source "$(conda info --base)/etc/profile.d/conda.sh"
+	conda activate earthren
+	echo "earthren environment activated"
+fi
 
 echo "--> generate elevation tiles"
 python3 split_half.py ../data/plzen_elev.tif
