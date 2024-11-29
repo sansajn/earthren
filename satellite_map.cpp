@@ -36,7 +36,7 @@ i: print transformations info */
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <spdlog/spdlog.h>
-#include "glmprint.hpp"
+#include "geometry/glmprint.hpp"
 #include "camera.hpp"
 #include "color.hpp"
 #include "free_camera.hpp"

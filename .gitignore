@@ -41,3 +41,5 @@ terrain_mesh
 terrain_mesh.ini
 terrain_scale
 terrain_scale.ini
+above_terrain
+core_dump/

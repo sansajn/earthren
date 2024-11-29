@@ -38,22 +38,28 @@ i: print transformations info */
 #include "imgui/imgui.h"
 #include "imgui/examples/imgui_impl_sdl.h"
 #include "geometry/glmprint.hpp"
-#include "camera.hpp"
+// #include "camera.hpp"  // want to use custom camera implementation
 #include "color.hpp"
 #include "free_camera.hpp"
 #include "texture.hpp"
 #include "shader.hpp"
 #include "io.hpp"
-#include "flat_shader.hpp"
-#include "four_terrain_ui.hpp"
+#include "terrain_scale_ui.hpp"
 #include "axes_model.hpp"
 #include "quad.hpp"
-#include "four_terrain_shader_program.hpp"
+#include "flat_shader.hpp"
+#include "height_overlap_shader_program.hpp"
+#include "above_terrain_outline_shader_program.hpp"
 
-using std::vector, std::string, std::pair, std::byte;
+// to implement is_above()
+#include <boost/geometry/algorithms/intersects.hpp>
+#include "geometry/box2.hpp"
+
+using std::vector, std::string, std::pair, std::byte, std::size;
 using std::tuple, std::get;
 using std::unique_ptr;
-using std::filesystem::path, std::ifstream;
+using std::filesystem::path, std::filesystem::exists;
+using std::ifstream;
 using std::cout, std::endl;
 using fmt::print;
 using std::chrono::steady_clock, std::chrono::duration_cast, 
@@ -75,18 +81,15 @@ constexpr float TERRAIN_SIZE_SCALE = 2.0f;
 constexpr float TERRAIN_HEIGHT_SCALE = 10.0f;
 constexpr float elevation_pixel_size = 26.063200588611451;  // this is tile dependent, use gdalinfo to figure it out
 
-path const VERTEX_SHADER_FILE = "four_terrain.vs",
-	FRAGMENT_SHADER_FILE = "satellite_map.fs",
-	LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
+constexpr unsigned DEFAULT_QUAD_RESOLOTION = 100;  // for 100x100 vertices quad
+
+path const LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_GEOMETRY_SHADER_FILE = "to_line.gs",
-	LIGHTDIR_FRAGMENT_SHADER_FILE = "colored.fs",
-	OUTLINE_VERTEX_SHADER_FILE = "height_map_outline.vs",
-	OUTLINE_GEOMETRY_SHADER_FILE = "to_outline.gs",
-	OUTLINE_FRAGMENT_SHADER_FILE = "colored.fs";
+	LIGHTDIR_FRAGMENT_SHADER_FILE = "colored.fs";
 
-path const config_file_path = "four_terrain.ini";
+path const config_file_path = "terrain_scale.ini";
 
-path const data_path = "data/gen/four_terrain";
+path const data_path = "data/gen/height_overlap";
 constexpr string elevation_tile_prefix = "plzen_elev_",
 	satellite_tile_prefix = "plzen_rgb_";
 
@@ -133,6 +136,105 @@ struct render_features {  // list of selected rendering features
 		calculate_shades;
 };
 
+
+/* - we are expecting that all terrainns has the same size textures so no reason to store texture w/h
+- grid_size is also the same for all terrain */
+struct terrain {
+	GLuint elevation_map,
+		satellite_map;
+	vec2 position;  //!< Terrain word position (within thee grid).
+	float elevation_min = 0.441305f;  // TODO: use terrain related value there
+};
+
+/*! \returns list of (TID, width, height) tripet for for each terrain tile. */
+vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols);
+
+float g_ground_height = 0.441305f;  // TODO: this should not be there, but part of something
+
+/*! Orbital camera over a terrain.
+\code
+map_camera cam{20.0f};
+cam.look_at = vec2{0, 0};
+
+while (true) {  // loop
+	// handle events
+	cam.update();  // update
+
+	mat4 V = cam.vew();
+	// render
+}
+\endcode */
+struct map_camera {
+	float theta,  //!< x-axis camera rotation in rad
+		phi;  //!< z-axis camera rotation in rad
+	float distance;  //!< camera distance from ground
+
+	glm::vec2 look_at;  //!< look-at point on a map
+
+	explicit map_camera(float d = 1.0f);
+	[[nodiscard]] glm::mat4 const & view() const {return _view;}
+	[[nodiscard]] glm::vec3 forward() const;  //!< gets camera forward direction
+	[[nodiscard]] glm::vec3 position() const {return _position;}
+
+	/*! \note view(), forward() or position() result available after the first update() called. */
+	void update();
+
+private:
+	glm::vec3 _position;
+	glm::mat4 _view;  //!< Camera view transformation matrix.
+	float _prev_ground_height;
+};
+
+map_camera::map_camera(float d)
+	: theta{0},
+	phi{0},
+	distance{d},
+	look_at{0, 0},
+	_position{0},
+	_prev_ground_height{g_ground_height} {}
+
+void map_camera::update() {
+	constexpr float height_offset = 0.1f;
+
+	//  to prevent popping camera in case ground is closer
+	float const ground_height = std::max(_prev_ground_height, g_ground_height);
+	_prev_ground_height = ground_height;
+
+	// we do not want to let distance < 0
+	distance = std::max(0.0f, distance);
+
+	vec3 const p0 = {look_at, ground_height};
+
+	vec3 const px = {1, 0, 0},
+		py = {0, 1, 0},
+		pz = {0, 0, 1};
+
+	float const cp = cos(phi),
+		sp = sin(phi),
+		ct = cos(theta),
+		st = sin(theta);
+
+	vec3 const cx = px*cp + py*sp,
+		cy = -px*sp*ct + py*cp*ct + pz*st,
+		cz = px*sp*st - py*cp*st + pz*ct;  // z-axis directional vector
+
+	_position = p0 + cz * distance;
+	_position.z = std::max(_position.z, ground_height + height_offset);  // clamp position.z
+
+	mat4 const V = {
+		cx.x, cy.x, cz.x, 0,
+		cx.y, cy.y, cz.y, 0,
+		cx.z, cy.z, cz.z, 0,
+		0, 0, 0, 1
+	};
+
+	_view = translate(V, -_position);
+}
+
+vec3 map_camera::forward() const {
+	return normalize(-vec3{_view[2]});
+}
+
 /*! Process user input.
 \returns false in case user want to quit, otherwise true. */
 template <typename Camera>
@@ -149,12 +251,44 @@ void input_camera(SDL_Event const & event, free_camera & cam, input_mode const &
 
 void update(free_camera & cam, input_mode const & mode, float dt);
 
+// Draw helpers
+
+//! Draws terrain quad with elevations and sattelite texture.
+void draw_terrain(height_overlap_shader_program & shader,
+	terrain const & trn,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	mat4 const & local_to_screen,
+	size_t elevation_width, size_t elevation_height,
+	float height_scale, float elevation_scale,
+	render_features const & features);
+
+//! Draws terrain quad as mesh.
+void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
+	terrain const & trn,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	vec3 color,
+	float height_scale,
+	float elevation_scale,
+	mat4 local_to_screen,
+	render_features const & features);
+
+
 bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
 	return get<1>(tile) == get<2>(tile);
 }
 
-/*! \returns list of (TID, width, height) tripet for for each terrain tile. */
-vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols);
+bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 const & pos) {  // TODO: do we want camera instead of pos there? is_above would make more sence in that case
+	namespace bg = boost::geometry;
+
+	// calculate terrain bounding box (it is axis aligned)
+	// the formula is `(position + quad_size) * model_scale`
+	vec2 const min_corner = trn.position * model_scale,
+		max_corner = (trn.position + quad_size) * model_scale;
+
+	geom::box2 const tile_area = {min_corner, max_corner};
+
+	return bg::intersects(vec2{pos}, tile_area);
+}
 
 // three lines
 constexpr float axis_verts[] = {
@@ -182,9 +316,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
 
 	// process arguments
+	string const title = string{path{argv[0]}.stem()} + " (OpenGL ES 3.2)"s;
 
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window * window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED,
+	SDL_Window * window = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -198,8 +333,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		<< "GL_RENDERER: " << glGetString(GL_RENDERER) << "\n"
 		<< "GLSL_VERSION: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
 	
-	four_terrain_ui ui;
+	terrain_scale_ui ui;
 	ui.height_scale = TERRAIN_HEIGHT_SCALE;
+	ui.quad_scale = TERRAIN_SIZE_SCALE;
+	ui.quad_resolution = DEFAULT_QUAD_RESOLOTION;
 	ui.init(config_file_path);
 	ui.setup(window, context);
 
@@ -208,7 +345,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 
-	four_terrain_shader_program shader;
+	height_overlap_shader_program shader;
 
 	// load shader program to visualize light direction
 	string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
@@ -224,19 +361,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLint const lightdir_local_to_screen_loc = glGetUniformLocation(lightdir_shader_program, "local_to_screen");
 	GLint const lightdir_line_color_loc = glGetUniformLocation(lightdir_shader_program, "fill_color");
 
-	// load shader program for triangle outline
-	string const outline_vs = read_file(OUTLINE_VERTEX_SHADER_FILE),
-		outline_gs = read_file(OUTLINE_GEOMETRY_SHADER_FILE),
-		outline_fs = read_file(OUTLINE_FRAGMENT_SHADER_FILE);
-
-	GLint const outline_shader_program = get_shader_program(outline_vs.c_str(), outline_fs.c_str(), outline_gs.c_str());
-	assert(shader.position_location() == glGetAttribLocation(outline_shader_program, "position"));
-
-	GLint const outline_heights_loc = glGetUniformLocation(outline_shader_program, "heights");
-	GLint const outline_height_map_size_loc = glGetUniformLocation(outline_shader_program, "height_map_size");
-	GLint const outline_height_scale_loc = glGetUniformLocation(outline_shader_program, "height_scale");
-	GLint const outline_local_to_screen_loc = glGetUniformLocation(outline_shader_program, "local_to_screen");
-	GLint const outline_line_color_loc = glGetUniformLocation(outline_shader_program, "fill_color");
+	// load shader program for wirefraame rendering
+	above_terrain_outline_shader_program outline_shader;
+	assert(shader.position_location() == outline_shader.position_location() && "we expect the same position attribute locations (=0)");
 
 	string const flat_vs = read_file("flat_shader.vs"),
 		flat_fs = read_file("flat_shader.fs");
@@ -255,6 +382,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	vector<tuple<GLuint, size_t, size_t>> tiles = read_tiles(grid_rows, grid_cols);  // list of [elevation, satelite, ...] tiles for each terrain
 
+	/* TODO: This is how wee work with elevations in a vertx shader program
+	float h = float(texture(heights, position.xy).r) * elevation_scale * height_scale; */
+	const int elevation_tile_max_value[] = {
+		564, 726,
+		625, 805
+	};
+
 	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -262,7 +396,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// create terrain mash
 	constexpr float quad_size = 1.0f;
-	auto const [vao, vbo, ibo, element_count] = create_quad_mesh(shader.position_location());
+	auto [vao, vbo, ibo, element_count] = create_quad_mesh(shader.position_location(), ui.quad_resolution);
 
 	// camera related stuff
 	map_camera cam{20.0f};
@@ -282,11 +416,39 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		.calculate_shades = true
 	};
 
-	float const model_scale = TERRAIN_SIZE_SCALE;
+	unsigned quad_resolution = ui.quad_resolution;  // save quad resolution to detect resolution changes
+
+	/* TODO: we want to make module responsible for loading grid of tiles from bellow code (another part of
+	the code would be responsible for rendering grid). */
+
+	/* There we have 2x2 grid of tiles/terrains. Grid starts with the first tile (e.g. plzen_elev_0_0.tif,
+	plzen_rgb_0_0.tif) and we have four adjacent tiles forms 2x2 grid. In the scene we simply draws whole
+	grid, there are not any view optimizations there. */
+	vector<terrain> terrain_grid(grid_rows*grid_cols);  // we have MxN grid of terrains
+
+	// initialize terrain grid
+	for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
+		for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
+			size_t const terrain_idx = row*grid_cols + col,
+				tile_idx = 2 * terrain_idx;
+			assert(terrain_idx < size(terrain_grid) && tile_idx < size(tiles));
+
+			terrain & t = terrain_grid[terrain_idx];
+			t.elevation_map = get<0>(tiles[tile_idx]);
+			t.satellite_map = get<0>(tiles[tile_idx+1]);
+			t.position = vec2{col, -row} * quad_size - vec2{grid_cols, 0} * quad_size*0.5f;
+			t.elevation_min = elevation_tile_max_value[terrain_idx];  //elevation_tile_min_value[terrain_idx];
+		}
+	}
 
 	auto t_prev = steady_clock::now();
 
-	while (true) {
+	// TODO: we need to detect camera position change
+	vec3 prev_cam_pos = cam.position();
+
+	terrain const * camera_terrain = nullptr;
+
+	while (true) {  // the loop
 		// compute dt
 		auto t_now = steady_clock::now();
 		float const dt = duration_cast<milliseconds>(t_now - t_prev).count() / 1000.0f;
@@ -319,104 +481,97 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		if (events.camera_switch)
 			cout << with_label{"V", V};
 
-		ui.create();  // do we need to do this every frame?
+		ui.create();
+
+		// detect quad resolution change
+		if (quad_resolution != static_cast<unsigned>(ui.quad_resolution)) {
+			assert(ui.quad_resolution > 1);
+			destroy_quad_mesh(vao, vbo, ibo);
+			std::tie(vao, vbo, ibo, element_count) = create_quad_mesh(shader.position_location(), ui.quad_resolution);
+			quad_resolution = ui.quad_resolution;
+		}
 
 		// render
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);  // clear buffer
 
 		glBindVertexArray(vao);  // VAO is independent of used program
 
+		float const model_scale = ui.quad_scale;
+
 		if (events.info_request) {
 			cout << "info:\n"
 				<< "model_scale=" << model_scale << '\n'
 				<< with_label{"V", V} << '\n'
-				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << '\n';
+				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << ", position=" << cam.position() << '\n';
+
+			// visualize terrain position
+			cout << "terrains: ";
+			for (terrain const & t : terrain_grid)
+				cout << t.position * model_scale << " ";
+			cout << "\n";
 		}
 
+		assert(size(tiles) > 2 && "we expect at least one elevation and one satellite tiles");
+
 		auto const & first_elevation_tile = *begin(tiles);
-		size_t const texture_width = get<1>(first_elevation_tile);
+		size_t const texture_width = get<1>(first_elevation_tile);  //= 716
 		size_t const texture_height = get<2>(first_elevation_tile);
-		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);
-		
-		// draw tiles
-		for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
-			for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
-				size_t const tile_idx = 2 * (row*grid_cols + col);
-				GLuint const height_map = get<0>(tiles[tile_idx]),
-					satellite_map = get<0>(tiles[tile_idx+1]);
+		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);  //= 0.000107174
 
-				vec2 model_pos = vec2{col, -row} * quad_size * model_scale - vec2{grid_cols, 0} * quad_size*model_scale*0.5f;
-				mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
-				mat4 const local_to_screen = P*V*M;
-
-				// render terrain
-				if (features.show_terrain) {
-					shader.use();
-
-					// bind height map texture
-					shader.heights(0);  // set height map sampler to use texture unit 0
-					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a height texture to active texture unit (0)
-
-					if (features.show_satellite) {
-						shader.use_satellite_map(true);
-						shader.satellite_map(1);  // set satellite map sampler to use texture unit 1
-						glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
-						glBindTexture(GL_TEXTURE_2D, satellite_map);  // bind a satellite texture to active texture unit (1)
+		// TODO: we ned to do is before camera update
+		if (prev_cam_pos != cam.position()) {  // on camera move
+			for (terrain const & trn : terrain_grid) {  // find terrain under camera and set ground_height
+				if (is_above(trn, quad_size, model_scale, cam.position())) {
+					if (&trn != camera_terrain) {  // TODO: we wan to change only when we are over new terrain
+						g_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
+						camera_terrain = &trn;  // save for later comparison
+						cout << "ground_height=" << g_ground_height << '\n';
 					}
-					else
-						shader.use_satellite_map(false);
-
-					if (features.calculate_shades)
-						shader.use_shading(true);
-					else
-						shader.use_shading(false);
-
-					shader.height_map_size(vec2{texture_width, texture_height});
-					shader.height_scale(ui.height_scale);
-					shader.elevation_scale(elevation_scale);
-					shader.local_to_screen(local_to_screen);
-
-					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+					break;
 				}
+			}
+			prev_cam_pos = cam.position();
+		}
 
-				// render light directions
-				if (features.show_lightdir) {
-					glUseProgram(lightdir_shader_program);
+		for (terrain const & t : terrain_grid) {  // draw terrain grid
+			vec2 const model_pos = t.position * model_scale;
+			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
+			mat4 const local_to_screen = P*V*M;
 
-					glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
+			if (features.show_terrain) {  // render terrain
+				draw_terrain(shader, t,
+					element_count,
+					local_to_screen,
+					texture_width, texture_height,
+					ui.height_scale, elevation_scale, features);
+			}
 
-					// bind height map
-					glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
-					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
+			// render light directions
+			if (features.show_lightdir) {
+				glUseProgram(lightdir_shader_program);
 
-					glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
-					glUniform1f(lightdir_height_scale_loc, ui.height_scale);
-					glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+				glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
 
-					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-				}
+				// bind height map
+				glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
+				glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+				glBindTexture(GL_TEXTURE_2D, t.elevation_map);  // bind a texture to active texture unit (0)
 
-				// render triangle outlines
-				if (features.show_outline) {
-					glUseProgram(outline_shader_program);
+				glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
+				glUniform1f(lightdir_height_scale_loc, ui.height_scale);
+				glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
-					glUniform3fv(outline_line_color_loc, 1, value_ptr(rgb::blue));
+				glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+			}
 
-					// bind height map
-					glUniform1i(outline_heights_loc, 0);  // set sampler s to use texture unit 0
-					glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-					glBindTexture(GL_TEXTURE_2D, height_map);  // bind a texture to active texture unit (0)
-
-					glUniform2f(outline_height_map_size_loc, texture_width, texture_height);
-					glUniform1f(outline_height_scale_loc, ui.height_scale);
-					glUniformMatrix4fv(outline_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
-
-					glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-				}
-			}  // for (col ...
-		}  // for (row ...
+			if (features.show_outline) {  // render wireframe
+				draw_terrain_outlines(outline_shader, t,
+					element_count,
+					rgb::blue,
+					ui.height_scale, elevation_scale, local_to_screen,
+					features);
+			}
+		}  // for (t ...
 
 		glBindVertexArray(0);  // unbind VAO
 
@@ -426,8 +581,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		mat4 const cam_rot = mat4{glm::mat3{V}};
 
 		// T*S*R
-		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25,-2.45,-5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
-			axes_local_to_screen = P*M_axes*cam_rot;  //=P*V*V'*M_axes
+		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25, -2.45, -5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
+			axes_local_to_screen = P*M_axes*cam_rot;  //= P*V*V'*M_axes
 
 		axes.draw(flat_shader, axes_local_to_screen);
 
@@ -439,10 +594,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	for(auto tile : tiles)  // delete textures
 		glDeleteTextures(1, &get<0>(tile));
 
-	glDeleteBuffers(1, &ibo);
-	glDeleteBuffers(1, &vbo);
-	glDeleteVertexArrays(1, &vao);
-	// glDeleteProgram(shader_program);
+	destroy_quad_mesh(vao, vbo, ibo);
 
 	ui.shutdown();
 
@@ -451,6 +603,77 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	SDL_Quit();
 	
 	return 0;
+}
+
+// TODO: this is ugly solution, too many arguments there
+void draw_terrain(height_overlap_shader_program & shader,
+	terrain const & trn,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	mat4 const & local_to_screen,
+	size_t elevation_width, size_t elevation_height,  // TODO: we only need size not w and h
+	float height_scale, float elevation_scale,
+	render_features const & features) {
+
+	shader.use();
+
+	// bind height map texture
+	shader.heights(0);  // set height map sampler to use texture unit 0
+	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+	glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a height texture to active texture unit (0)
+
+	if (features.show_satellite) {
+		shader.use_satellite_map(true);
+		shader.satellite_map(1);  // set satellite map sampler to use texture unit 1
+		glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
+		glBindTexture(GL_TEXTURE_2D, trn.satellite_map);  // bind a satellite texture to active texture unit (1)
+	}
+	else
+		shader.use_satellite_map(false);
+
+	if (features.calculate_shades)
+		shader.use_shading(true);
+	else
+		shader.use_shading(false);
+
+	constexpr float elevation_tile_pixel_size = 26.063200588611451;  // see gdalinfo
+
+	assert(elevation_width == elevation_height && "we expect square elevation tiles");
+	shader.terrain_size(elevation_width * elevation_tile_pixel_size);
+	shader.elevation_tile_size(elevation_width);
+	shader.normal_tile_size(elevation_width - 4);  // 2px border
+	shader.height_scale(height_scale);
+	shader.elevation_scale(elevation_scale);
+	shader.local_to_screen(local_to_screen);
+
+	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+}
+
+void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
+	terrain const & trn,
+	unsigned int element_count,  // number of quad mesh triengle elements to draw
+	vec3 color,
+	float height_scale,
+	float elevation_scale,
+	mat4 local_to_screen,
+	render_features const & features) {
+
+	// render triangle outlines
+	if (features.show_outline) {
+		shader.use();
+
+		shader.fill_color(color);
+
+		// bind height map
+		shader.elevation_map(0);  // set sampler s to use texture unit 0
+		glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+		glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a texture to active texture unit (0)
+
+		shader.elevation_scale(elevation_scale);
+		shader.height_scale(height_scale);
+		shader.local_to_screen(local_to_screen);
+
+		glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+	}
 }
 
 // handling render features
@@ -683,12 +906,15 @@ vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_c
 	for (size_t row = 0; row < grid_rows; ++row) {
 		for (size_t col = 0; col < grid_cols; ++col) {
 			string const height_tile_name = fmt::format("{}/{}{}_{}.tif", data_path.c_str(), elevation_tile_prefix, col, row);
+			assert(exists(height_tile_name) && "elevation tile not found");
 
 			auto const height_tile = create_texture_16b(height_tile_name);
 			assert(is_square(height_tile));
 			tiles.push_back(height_tile);
 
 			string const satellite_tile_name = fmt::format("{}/{}{}_{}.tif", data_path.c_str(), satellite_tile_prefix, col, row);
+			assert(exists(satellite_tile_name) && "satellite tile not found");
+
 			auto const satellite_tile = create_texture_8b(satellite_tile_name);
 			assert(is_square(satellite_tile));
 			tiles.push_back(satellite_tile);

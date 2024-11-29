@@ -1,9 +1,19 @@
 /*! \file glmprint.hpp
 GLM types printers.
 
+To visualize vec2, vec3 or vec4 just use standard streams e.g.
+\code
+vec2 a{1,2};
+cout << "a = " << a;  // a = (1,2)
+\endcode
+
+For an up to date implementaiton see [geometry/geometry](https://github.com/sansajn/geometry/tree/master/geometry) repository.
+
+See `test_print.cpp` sample for a guide to use print functions.
+
 TODO:
-- quick guide how to use the library
-- get aligne to numpy printing (vector, matrix) output */
+- get aligne to numpy printing (vector, matrix) output
+> TODO: give numpy sample output */
 #pragma once
 #include <vector>
 #include <string>
@@ -14,6 +24,7 @@ TODO:
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_access.hpp>
 
+namespace detail {
 
 template <typename Mat>
 void print(std::ostream & out, Mat const & M) {
@@ -61,10 +72,12 @@ void print(std::ostream & out, Mat const & M) {
 	out << "\n";
 }
 
+}  // detail
+
 //! Generic matrix output operator (meant to be used by labelers e.g. with_label{}).
 template<glm::length_t C, glm::length_t R, typename T, glm::qualifier Q = glm::defaultp>
 std::ostream & operator<<(std::ostream & out, glm::mat<C, R, T, Q> const & M) {
-	print(out, M);
+	detail::print(out, M);
 	return out;
 }
 

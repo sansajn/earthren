@@ -1,5 +1,8 @@
 
 SConstruct
+above_terrain.cpp
+above_terrain_outline_shader_program.cpp
+above_terrain_outline_shader_program.hpp
 axes_model.cpp
 axes_model.hpp
 camera.cpp

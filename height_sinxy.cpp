@@ -17,7 +17,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
-#include "glmprint.hpp"
+#include "geometry/glmprint.hpp"
 
 using std::vector, std::string, std::tuple, std::pair, std::byte;
 using std::unique_ptr;

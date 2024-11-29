@@ -14,7 +14,8 @@ def build():
 		CPPDEFINES=[
 			'BOOST_STACKTRACE_USE_BACKTRACE',  # requires 'boost_stacktrace_backtrace', 'dl' and 'backtrace'
 			'IMGUI_IMPL_OPENGL_ES3'],  # ImGUI OpenGL ES3 backand
-		CPPPATH=['.', 'imgui/', 'imgui/examples/'])
+		CPPPATH=['.', 'libs/',
+			'imgui/', 'imgui/examples/'])
 
 	if GetOption('build_debug'):
 		cpp20_env.Append(CCFLAGS=['-ggdb3', '-O0', '-D_DEBUG'])
@@ -94,6 +95,17 @@ def build():
 	env.Program(['terrain_scale.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
 		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
 		'set_uniform.cpp', imgui])
+
+	# terrain mesh sample
+	above_terrain_common = ['free_camera.cpp', 'texture.cpp', 'shader.cpp',
+		'tiff.cpp', 'io.cpp']
+
+	env.Program(['above_terrain.cpp', above_terrain_common, 'flat_shader.cpp', 'quad.cpp',
+		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
+		'above_terrain_outline_shader_program.cpp', 'set_uniform.cpp', imgui])
+
+	# generate_dump sample
+	env.Program(['generate_dump.cpp'])
 
 	# other samples ...
 

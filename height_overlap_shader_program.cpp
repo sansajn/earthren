@@ -38,7 +38,7 @@ height_overlap_shader_program::height_overlap_shader_program() {
 	_terrain_size = glGetUniformLocation(_prog, "terrain_size");
 	_elevation_tile_size = glGetUniformLocation(_prog, "elevation_tile_size");
 
-	// check uniform active
+	// check uniforms are active
 	assert(_local_to_screen != -1);
 	assert(_heights != -1);
 	assert(_elevation_scale != -1);

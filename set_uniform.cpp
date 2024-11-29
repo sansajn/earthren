@@ -51,8 +51,9 @@ void set_uniform<int>(int location, int const & v) {
 	glUniform1i(location, v);
 }
 
+// TODO: is this still true in OpenGL ES 3?
 template <>
-void set_uniform<unsigned>([[maybe_unused]] int location, unsigned const & v) {
+void set_uniform<unsigned>([[maybe_unused]] int location, [[maybe_unused]] unsigned const & v) {
 	//	glUniform1ui(location, v);
 	throw std::logic_error{"unsigned uniform is not supported in opengl es 2"};
 }
