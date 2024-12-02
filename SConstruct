@@ -100,12 +100,18 @@ def build():
 	above_terrain_common = ['free_camera.cpp', 'texture.cpp', 'shader.cpp',
 		'tiff.cpp', 'io.cpp']
 
+	# above terrain
 	env.Program(['above_terrain.cpp', above_terrain_common, 'flat_shader.cpp', 'quad.cpp',
 		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
 		'above_terrain_outline_shader_program.cpp', 'set_uniform.cpp', imgui])
 
 	# generate_dump sample
 	env.Program(['generate_dump.cpp'])
+
+	# terrain grid
+	env.Program(['terrain_grid.cpp', above_terrain_common, 'flat_shader.cpp', 'quad.cpp',
+		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
+		'above_terrain_outline_shader_program.cpp', 'set_uniform.cpp', imgui])
 
 	# other samples ...
 

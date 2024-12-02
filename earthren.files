@@ -235,6 +235,7 @@ set_uniform.hpp
 shader.cpp
 shader.hpp
 sinxy_heights.cpp
+terrain_grid.cpp
 terrain_mesh.cpp
 terrain_scale.cpp
 terrain_scale_ui.cpp
