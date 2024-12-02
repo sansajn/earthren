@@ -22,6 +22,7 @@ i: print transformations info */
 #include <memory>
 #include <tuple>
 #include <utility>
+#include <regex>
 #include <cassert>
 #include <cstddef>
 #include <csignal>
@@ -143,9 +144,24 @@ struct terrain {
 	GLuint elevation_map,
 		satellite_map;
 	vec2 position;  //!< Terrain word position (within thee grid).
-	float elevation_min = 0.441305f;  // TODO: use terrain related value there
+	float elevation_min = 0.441305f;  // TODO: use terrain related value there, TODO: is this used?
 };
 
+struct terrain_grid {
+	/* TODO: should be read_tiles member of terrain_grid? I think in the first step it is easier to
+	implement due to undestricted access and as a second step we can make it non member funnction if
+	it makes any sence. */
+
+	void load_tiles();
+	[[nodiscard]] size_t size() const {return std::size(_terrains);}
+
+	// TODO: some basic tile informations
+
+private:
+	vector<terrain> _terrains;  // TODO: we need cleanup of textures in destructor
+};
+
+// TODO: we want read_tiles to produce instance of terrainn_grid instead of list of tiles
 /*! \returns list of (TID, width, height) tripet for for each terrain tile. */
 vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols);
 
@@ -275,6 +291,10 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 
 bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
 	return get<1>(tile) == get<2>(tile);
+}
+
+GLuint get_tid(tuple<GLuint, size_t, size_t> const & tile) {  //!< get OpenGL texture ID
+	return get<0>(tile);
 }
 
 bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 const & pos) {  // TODO: do we want camera instead of pos there? is_above would make more sence in that case
@@ -424,22 +444,28 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	/* There we have 2x2 grid of tiles/terrains. Grid starts with the first tile (e.g. plzen_elev_0_0.tif,
 	plzen_rgb_0_0.tif) and we have four adjacent tiles forms 2x2 grid. In the scene we simply draws whole
 	grid, there are not any view optimizations there. */
-	vector<terrain> terrain_grid(grid_rows*grid_cols);  // we have MxN grid of terrains
+	vector<terrain> terrain_grid_list(grid_rows*grid_cols);  // we have MxN grid of terrains
 
 	// initialize terrain grid
 	for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
 		for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
 			size_t const terrain_idx = row*grid_cols + col,
 				tile_idx = 2 * terrain_idx;
-			assert(terrain_idx < size(terrain_grid) && tile_idx < size(tiles));
+			assert(terrain_idx < size(terrain_grid_list) && tile_idx < size(tiles));
 
-			terrain & t = terrain_grid[terrain_idx];
+			terrain & t = terrain_grid_list[terrain_idx];
 			t.elevation_map = get<0>(tiles[tile_idx]);
 			t.satellite_map = get<0>(tiles[tile_idx+1]);
 			t.position = vec2{col, -row} * quad_size - vec2{grid_cols, 0} * quad_size*0.5f;
 			t.elevation_min = elevation_tile_max_value[terrain_idx];  //elevation_tile_min_value[terrain_idx];
 		}
 	}
+
+	// TODO: for testing
+	terrain_grid terrains;
+	terrains.load_tiles();
+	spdlog::info("terrain-count={}", terrains.size());
+
 
 	auto t_prev = steady_clock::now();
 
@@ -506,7 +532,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 			// visualize terrain position
 			cout << "terrains: ";
-			for (terrain const & t : terrain_grid)
+			for (terrain const & t : terrain_grid_list)
 				cout << t.position * model_scale << " ";
 			cout << "\n";
 		}
@@ -520,7 +546,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		// TODO: we ned to do is before camera update
 		if (prev_cam_pos != cam.position()) {  // on camera move
-			for (terrain const & trn : terrain_grid) {  // find terrain under camera and set ground_height
+			for (terrain const & trn : terrain_grid_list) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
 					if (&trn != camera_terrain) {  // TODO: we wan to change only when we are over new terrain
 						g_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
@@ -533,7 +559,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			prev_cam_pos = cam.position();
 		}
 
-		for (terrain const & t : terrain_grid) {  // draw terrain grid
+		for (terrain const & t : terrain_grid_list) {  // draw terrain grid
 			vec2 const model_pos = t.position * model_scale;
 			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 			mat4 const local_to_screen = P*V*M;
@@ -899,6 +925,79 @@ void update(free_camera & cam, input_mode const & mode, float dt) {
 		cam.position += cam.right() * speed * dt;
 
 	cam.update();  // update camera
+}
+
+vec2 to_word_position(int column, int row) {
+	// TODO: implement
+	return vec2{-1, -1};
+}
+
+void terrain_grid::load_tiles() {
+	using std::filesystem::directory_iterator;
+	using std::regex, std::smatch, std::regex_match;
+
+	path const tile_directory = data_path;
+	if (!exists(tile_directory)) {
+		spdlog::error("tile directory '{}' does not exists", tile_directory.c_str());
+		return;
+	}
+
+	// - make a list of tiles froom tiles_directory
+	// - we expect `.+_elev_C_R.tif` and `.+_rgb_C_R.tif` tile files there
+	for (auto const & dir_entry: directory_iterator{tile_directory}) {
+		path const & file = dir_entry.path();
+		spdlog::info(file.c_str());
+
+		// - for each elevation tile
+		if (file.filename().string().starts_with(elevation_tile_prefix)) {  // TODO: can we use range algorithm there?
+			// TODO: introdudee elevation_file
+			spdlog::info("-> {}", file.c_str());
+
+			// - parse grid collumn (C) and row (R) position
+			regex const tile_pattern{R"(.+(\d+)_(\d+)\.tif)"};  // (column), (row)
+			smatch what;
+			string const filename = file.filename().string();
+			if (regex_match(filename, what, tile_pattern)) {
+				assert(std::size(what) == 3);
+				spdlog::info("    {}, {}", what[1].str(), what[2].str());
+			}
+			else
+				continue;  // skip file
+
+			// - check we have coresponding rgb file
+			string const column_str = what[1].str(),
+				row_str = what[2].str();
+			path const satellite_path = tile_directory / path{fmt::format("{}{}_{}.tif", satellite_tile_prefix, column_str, row_str)};
+			if (!exists(satellite_path)) {
+				spdlog::info("corresponding satellite data for elevation tile ('{}') not found", file.c_str());
+				continue;
+			}
+			// TODO: this is super slow implementation, we should search in a list of tile files
+
+			// - calculate terrain word position
+			int const column = stoi(column_str),
+				row = stoi(row_str);
+			vec2 word_pos = to_word_position(column, row);
+			spdlog::info("    word_pos={}", to_string(word_pos));
+
+			// - load elevation tile
+			auto const elevation_tile = create_texture_16b(file);
+			assert(is_square(elevation_tile));
+
+			// - load satellite tile
+			auto const satellite_tile = create_texture_8b(satellite_path);
+			assert(is_square(satellite_tile));
+
+			// - create terrain instance and filll maps and position
+			terrain trn;
+			trn.elevation_map = get_tid(elevation_tile);
+			trn.satellite_map = get_tid(satellite_tile);
+			trn.position = word_pos;
+
+			// - add to the list of terrains
+			_terrains.push_back(trn);
+		}
+	}
 }
 
 vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols) {
