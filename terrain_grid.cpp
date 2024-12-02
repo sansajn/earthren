@@ -147,6 +147,7 @@ struct terrain {
 	float elevation_min = 0.441305f;  // TODO: use terrain related value there, TODO: is this used?
 };
 
+// TODO: we wold like to have unit test for this
 struct terrain_grid {
 	/* TODO: should be read_tiles member of terrain_grid? I think in the first step it is easier to
 	implement due to undestricted access and as a second step we can make it non member funnction if
