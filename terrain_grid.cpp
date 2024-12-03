@@ -145,7 +145,7 @@ struct terrain {
 	GLuint elevation_map,
 		satellite_map;
 	vec2 position;  //!< Terrain word position (within thee grid).
-	float elevation_min = 0.441305f;  // TODO: use terrain related value there, TODO: is this used?
+	float elevation_min;  // TODO: use terrain related value there, TODO: rename to eelevation_max
 };
 
 // TODO: elevation_min data are missing during load_tiles in a grid
@@ -169,9 +169,17 @@ struct terrain_grid {
 	}
 
 	// TODO: some basic tile informations
+	int elevation_tile_size;  //= 716, TODO: this is set during load_tiles()
 
 	int grid_column_count = 2;
 	float quad_size = 1.0f;
+
+	/* TODO: This is how wee work with elevations in a vertx shader program
+	float h = float(texture(heights, position.xy).r) * elevation_scale * height_scale; */
+	constexpr static int elevation_tile_max_value[4] = {
+		564, 726,
+		625, 805
+	};
 
 private:
 	vector<terrain> _terrains;  // TODO: we need cleanup of textures in destructor
@@ -419,14 +427,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		grid_cols = 2;
 	assert((grid_rows % 2) == 0 && (grid_cols % 2) == 0);
 
-	vector<tuple<GLuint, size_t, size_t>> tiles = read_tiles(grid_rows, grid_cols);  // list of [elevation, satelite, ...] tiles for each terrain
+	// vector<tuple<GLuint, size_t, size_t>> tiles = read_tiles(grid_rows, grid_cols);  // list of [elevation, satelite, ...] tiles for each terrain
 
 	/* TODO: This is how wee work with elevations in a vertx shader program
 	float h = float(texture(heights, position.xy).r) * elevation_scale * height_scale; */
-	const int elevation_tile_max_value[] = {
-		564, 726,
-		625, 805
-	};
+	// const int elevation_tile_max_value[] = {
+	// 	564, 726,
+	// 	625, 805
+	// };
 
 	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
 
@@ -463,22 +471,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	/* There we have 2x2 grid of tiles/terrains. Grid starts with the first tile (e.g. plzen_elev_0_0.tif,
 	plzen_rgb_0_0.tif) and we have four adjacent tiles forms 2x2 grid. In the scene we simply draws whole
 	grid, there are not any view optimizations there. */
-	vector<terrain> terrain_grid_list(grid_rows*grid_cols);  // we have MxN grid of terrains
+	// vector<terrain> terrain_grid_list(grid_rows*grid_cols);  // we have MxN grid of terrains
 
 	// initialize terrain grid
-	for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
-		for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
-			size_t const terrain_idx = row*grid_cols + col,
-				tile_idx = 2 * terrain_idx;
-			assert(terrain_idx < size(terrain_grid_list) && tile_idx < size(tiles));
+	// for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
+	// 	for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
+	// 		size_t const terrain_idx = row*grid_cols + col,
+	// 			tile_idx = 2 * terrain_idx;
+	// 		assert(terrain_idx < size(terrain_grid_list) && tile_idx < size(tiles));
 
-			terrain & t = terrain_grid_list[terrain_idx];
-			t.elevation_map = get<0>(tiles[tile_idx]);
-			t.satellite_map = get<0>(tiles[tile_idx+1]);
-			t.position = vec2{col, -row} * quad_size - vec2{grid_cols, 0} * quad_size*0.5f;
-			t.elevation_min = elevation_tile_max_value[terrain_idx];  //elevation_tile_min_value[terrain_idx];
-		}
-	}
+	// 		terrain & t = terrain_grid_list[terrain_idx];
+	// 		t.elevation_map = get<0>(tiles[tile_idx]);
+	// 		t.satellite_map = get<0>(tiles[tile_idx+1]);
+	// 		t.position = vec2{col, -row} * quad_size - vec2{grid_cols, 0} * quad_size*0.5f;
+	// 		t.elevation_min = elevation_tile_max_value[terrain_idx];  //elevation_tile_min_value[terrain_idx];
+	// 	}
+	// }
 
 	// TODO: for testing
 	terrain_grid terrains;
@@ -490,8 +498,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	auto t_prev = steady_clock::now();
 
-	// TODO: we need to detect camera position change
-	vec3 prev_cam_pos = cam.position();
+	vec3 prev_cam_pos = cam.position();  // to detect camera position change between the looop iteratoins
 
 	terrain const * camera_terrain = nullptr;
 
@@ -563,11 +570,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			cout << "\n";
 		}
 
-		assert(size(tiles) > 2 && "we expect at least one elevation and one satellite tiles");
+		// assert(size(tiles) > 2 && "we expect at least one elevation and one satellite tiles");
+		assert(size(terrains) > 0 && "we expect at least one terrain to render something");
 
-		auto const & first_elevation_tile = *begin(tiles);
-		size_t const texture_width = get<1>(first_elevation_tile);  //= 716
-		size_t const texture_height = get<2>(first_elevation_tile);
+		// auto const & first_elevation_tile = *begin(tiles);
+		// size_t const texture_width = get<1>(first_elevation_tile);  //= 716
+		// size_t const texture_height = get<2>(first_elevation_tile);
+		int const texture_width = terrains.elevation_tile_size,  //= 716
+			texture_height = terrains.elevation_tile_size;  //!< we should introduce texture_size
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);  //= 0.000107174
 
 		// TODO: we ned to do is before camera update
@@ -643,8 +653,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		SDL_GL_SwapWindow(window);
 	}
 	
-	for(auto tile : tiles)  // delete textures
-		glDeleteTextures(1, &get<0>(tile));
+	// for(auto tile : tiles)  // delete textures
+	// 	glDeleteTextures(1, &get<0>(tile));
+
+	for (auto const & trn : terrains.terrains()) {   // TODO: move this into grid constructor
+		glDeleteTextures(1, &trn.elevation_map);
+		glDeleteTextures(1, &trn.satellite_map);
+	}
 
 	destroy_quad_mesh(vao, vbo, ibo);
 
@@ -1010,6 +1025,7 @@ void terrain_grid::load_tiles() {
 			// - load elevation tile
 			auto const elevation_tile = create_texture_16b(file);
 			assert(is_square(elevation_tile));
+			elevation_tile_size = get<1>(elevation_tile);  // TODO: we do not want set this for every file
 
 			// - load satellite tile
 			auto const satellite_tile = create_texture_8b(satellite_path);
@@ -1020,6 +1036,9 @@ void terrain_grid::load_tiles() {
 			trn.elevation_map = get_tid(elevation_tile);
 			trn.satellite_map = get_tid(satellite_tile);
 			trn.position = word_pos;
+
+			// - calculate elevation max value
+			trn.elevation_min = elevation_tile_max_value[column + row*grid_column_count];
 
 			// - add to the list of terrains
 			_terrains.push_back(trn);
