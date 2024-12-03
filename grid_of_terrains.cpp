@@ -501,6 +501,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 					ui.height_scale, elevation_scale, features);
 			}
 
+			// TODO: we want draw funciton for that
 			// render light directions
 			if (features.show_lightdir) {
 				glUseProgram(lightdir_shader_program);
@@ -611,23 +612,39 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	render_features const & features) {
 
 	// render triangle outlines
-	if (features.show_outline) {
-		shader.use();
+	shader.use();
 
-		shader.fill_color(color);
+	shader.fill_color(color);
 
-		// bind height map
-		shader.elevation_map(0);  // set sampler s to use texture unit 0
-		glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-		glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a texture to active texture unit (0)
+	// bind height map
+	shader.elevation_map(0);  // set sampler s to use texture unit 0
+	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+	glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a texture to active texture unit (0)
 
-		shader.elevation_scale(elevation_scale);
-		shader.height_scale(height_scale);
-		shader.local_to_screen(local_to_screen);
+	shader.elevation_scale(elevation_scale);
+	shader.height_scale(height_scale);
+	shader.local_to_screen(local_to_screen);
 
-		glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-	}
+	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 }
+
+void draw_terrain_light_directions() {
+	glUseProgram(lightdir_shader_program);
+
+	glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
+
+	// bind height map
+	glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
+	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
+	glBindTexture(GL_TEXTURE_2D, t.elevation_map);  // bind a texture to active texture unit (0)
+
+	glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
+	glUniform1f(lightdir_height_scale_loc, ui.height_scale);
+	glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+
+	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+}
+
 
 // handling render features
 void input_render_features(SDL_Event const & event, render_features & features) {
