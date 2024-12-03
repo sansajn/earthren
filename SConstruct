@@ -108,8 +108,8 @@ def build():
 	# generate_dump sample
 	env.Program(['generate_dump.cpp'])
 
-	# terrain grid
-	env.Program(['terrain_grid.cpp', above_terrain_common, 'flat_shader.cpp', 'quad.cpp',
+	# grid of terrains
+	env.Program(['grid_of_terrains.cpp', above_terrain_common, 'flat_shader.cpp', 'quad.cpp',
 		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
 		'above_terrain_outline_shader_program.cpp', 'set_uniform.cpp', imgui])
 

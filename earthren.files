@@ -29,6 +29,7 @@ geoms_plane.cpp
 geoms_plane.gs
 geoms_plane_facen.vs
 geoms_plane_normal.vs
+grid_of_terrains.cpp
 gs_triangle_broken.cpp
 gs_triangle_broken.gs
 gs_triangle_broken.vs

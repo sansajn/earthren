@@ -40,7 +40,6 @@ i: print transformations info */
 #include "imgui/imgui.h"
 #include "imgui/examples/imgui_impl_sdl.h"
 #include "geometry/glmprint.hpp"
-// #include "camera.hpp"  // want to use custom camera implementation
 #include "color.hpp"
 #include "free_camera.hpp"
 #include "texture.hpp"
