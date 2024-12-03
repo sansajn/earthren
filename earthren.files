@@ -237,6 +237,7 @@ shader.cpp
 shader.hpp
 sinxy_heights.cpp
 terrain_grid.cpp
+terrain_grid.hpp
 terrain_mesh.cpp
 terrain_scale.cpp
 terrain_scale_ui.cpp
