@@ -23,6 +23,7 @@ i: print transformations info */
 #include <tuple>
 #include <utility>
 #include <regex>
+#include <ranges>
 #include <cassert>
 #include <cstddef>
 #include <csignal>
@@ -147,7 +148,7 @@ struct terrain {
 	float elevation_min = 0.441305f;  // TODO: use terrain related value there, TODO: is this used?
 };
 
-// TODO: we wold like to have unit test for this
+// TODO: elevation_min data are missing during load_tiles in a grid
 struct terrain_grid {
 	/* TODO: should be read_tiles member of terrain_grid? I think in the first step it is easier to
 	implement due to undestricted access and as a second step we can make it non member funnction if
@@ -156,11 +157,28 @@ struct terrain_grid {
 	void load_tiles();
 	[[nodiscard]] size_t size() const {return std::size(_terrains);}
 
+	/* TODO: we need bether name, because terrains will be most probably used as a
+	name for terrrain_grid instance, this way
+	\code
+	terrain_grid terrains;
+	// ...
+	for (terrain const & terrains.terrains()) {...}
+	\endcode */
+	auto terrains() const {  //!< \returns list of terrains as range
+		return std::ranges::subrange{std::begin(_terrains), std::end(_terrains)};
+	}
+
 	// TODO: some basic tile informations
+
+	int grid_column_count = 2;
+	float quad_size = 1.0f;
 
 private:
 	vector<terrain> _terrains;  // TODO: we need cleanup of textures in destructor
 };
+
+//! Helper function to calculate word position from grid (coumn, row) position.
+vec2 to_word_position(int column, int row, int grid_column_count, float quad_size);
 
 // TODO: we want read_tiles to produce instance of terrainn_grid instead of list of tiles
 /*! \returns list of (TID, width, height) tripet for for each terrain tile. */
@@ -464,6 +482,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// TODO: for testing
 	terrain_grid terrains;
+	terrains.grid_column_count = grid_cols;
+	terrains.quad_size = quad_size;  // TODO: we need API for quad_size and grid_column_count
 	terrains.load_tiles();
 	spdlog::info("terrain-count={}", terrains.size());
 
@@ -532,8 +552,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << ", position=" << cam.position() << '\n';
 
 			// visualize terrain position
-			cout << "terrains: ";
-			for (terrain const & t : terrain_grid_list)
+			// cout << "terrains: ";
+			// for (terrain const & t : terrain_grid_list)
+			// 	cout << t.position * model_scale << " ";
+			// cout << "\n";
+
+			cout << "terrain_grid: ";
+			for (terrain const & t : terrains.terrains())
 				cout << t.position * model_scale << " ";
 			cout << "\n";
 		}
@@ -547,7 +572,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		// TODO: we ned to do is before camera update
 		if (prev_cam_pos != cam.position()) {  // on camera move
-			for (terrain const & trn : terrain_grid_list) {  // find terrain under camera and set ground_height
+			for (terrain const & trn : terrains.terrains()/*terrain_grid_list*/) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
 					if (&trn != camera_terrain) {  // TODO: we wan to change only when we are over new terrain
 						g_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
@@ -560,7 +585,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			prev_cam_pos = cam.position();
 		}
 
-		for (terrain const & t : terrain_grid_list) {  // draw terrain grid
+		for (terrain const & t : terrains.terrains()/*terrain_grid_list*/) {  // draw terrain grid
 			vec2 const model_pos = t.position * model_scale;
 			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 			mat4 const local_to_screen = P*V*M;
@@ -928,12 +953,13 @@ void update(free_camera & cam, input_mode const & mode, float dt) {
 	cam.update();  // update camera
 }
 
-vec2 to_word_position(int column, int row) {
-	// TODO: implement
-	return vec2{-1, -1};
+vec2 to_word_position(int column, int row, int grid_column_count, float quad_size) {
+	vec2 const position = vec2{column, -row} * quad_size - vec2{grid_column_count, 0} * quad_size*0.5f;
+	return position;
 }
 
 void terrain_grid::load_tiles() {
+	// TODO: the implementation produce unordered list of terrains (which can be a performance issue during the rendering because you want to access adjacent terrains).
 	using std::filesystem::directory_iterator;
 	using std::regex, std::smatch, std::regex_match;
 
@@ -978,7 +1004,7 @@ void terrain_grid::load_tiles() {
 			// - calculate terrain word position
 			int const column = stoi(column_str),
 				row = stoi(row_str);
-			vec2 word_pos = to_word_position(column, row);
+			vec2 word_pos = to_word_position(column, row, grid_column_count, quad_size);
 			spdlog::info("    word_pos={}", to_string(word_pos));
 
 			// - load elevation tile
