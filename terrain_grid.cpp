@@ -154,17 +154,16 @@ struct terrain_grid {
 	implement due to undestricted access and as a second step we can make it non member funnction if
 	it makes any sence. */
 
-	void load_tiles();
+	void load_tiles();  // TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
 	[[nodiscard]] size_t size() const {return std::size(_terrains);}
 
-	/* TODO: we need bether name, because terrains will be most probably used as a
-	name for terrrain_grid instance, this way
+	/*! \returns Range to iterate through list of terrains.
 	\code
 	terrain_grid terrains;
 	// ...
-	for (terrain const & terrains.terrains()) {...}
+	for (terrain const & terrains.iterate()) {...}
 	\endcode */
-	auto terrains() const {  //!< \returns list of terrains as range
+	auto iterate() const {  //!< \returns list of terrains as range
 		return std::ranges::subrange{std::begin(_terrains), std::end(_terrains)};
 	}
 
@@ -181,16 +180,19 @@ struct terrain_grid {
 		625, 805
 	};
 
+	~terrain_grid() {
+		for (terrain const & trn : _terrains) {  // TODO: terrain is now owner of textures so it is terrain responsibility to delete textures
+			glDeleteTextures(1, &trn.elevation_map);
+			glDeleteTextures(1, &trn.satellite_map);
+		}
+	}
+
 private:
 	vector<terrain> _terrains;  // TODO: we need cleanup of textures in destructor
 };
 
 //! Helper function to calculate word position from grid (coumn, row) position.
 vec2 to_word_position(int column, int row, int grid_column_count, float quad_size);
-
-// TODO: we want read_tiles to produce instance of terrainn_grid instead of list of tiles
-/*! \returns list of (TID, width, height) tripet for for each terrain tile. */
-vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols);
 
 float g_ground_height = 0.441305f;  // TODO: this should not be there, but part of something
 
@@ -427,17 +429,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		grid_cols = 2;
 	assert((grid_rows % 2) == 0 && (grid_cols % 2) == 0);
 
-	// vector<tuple<GLuint, size_t, size_t>> tiles = read_tiles(grid_rows, grid_cols);  // list of [elevation, satelite, ...] tiles for each terrain
-
-	/* TODO: This is how wee work with elevations in a vertx shader program
-	float h = float(texture(heights, position.xy).r) * elevation_scale * height_scale; */
-	// const int elevation_tile_max_value[] = {
-	// 	564, 726,
-	// 	625, 805
-	// };
-
-	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
-
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
 
@@ -465,36 +456,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	unsigned quad_resolution = ui.quad_resolution;  // save quad resolution to detect resolution changes
 
-	/* TODO: we want to make module responsible for loading grid of tiles from bellow code (another part of
-	the code would be responsible for rendering grid). */
-
-	/* There we have 2x2 grid of tiles/terrains. Grid starts with the first tile (e.g. plzen_elev_0_0.tif,
-	plzen_rgb_0_0.tif) and we have four adjacent tiles forms 2x2 grid. In the scene we simply draws whole
-	grid, there are not any view optimizations there. */
-	// vector<terrain> terrain_grid_list(grid_rows*grid_cols);  // we have MxN grid of terrains
-
-	// initialize terrain grid
-	// for (int row = 0; row < static_cast<int>(grid_rows); ++row) {  // note: we need row:int because of -row in calculations
-	// 	for (int col = 0; col < static_cast<int>(grid_cols); ++col) {
-	// 		size_t const terrain_idx = row*grid_cols + col,
-	// 			tile_idx = 2 * terrain_idx;
-	// 		assert(terrain_idx < size(terrain_grid_list) && tile_idx < size(tiles));
-
-	// 		terrain & t = terrain_grid_list[terrain_idx];
-	// 		t.elevation_map = get<0>(tiles[tile_idx]);
-	// 		t.satellite_map = get<0>(tiles[tile_idx+1]);
-	// 		t.position = vec2{col, -row} * quad_size - vec2{grid_cols, 0} * quad_size*0.5f;
-	// 		t.elevation_min = elevation_tile_max_value[terrain_idx];  //elevation_tile_min_value[terrain_idx];
-	// 	}
-	// }
-
-	// TODO: for testing
+	// create grid of terrains
 	terrain_grid terrains;
 	terrains.grid_column_count = grid_cols;
 	terrains.quad_size = quad_size;  // TODO: we need API for quad_size and grid_column_count
 	terrains.load_tiles();
 	spdlog::info("terrain-count={}", terrains.size());
-
 
 	auto t_prev = steady_clock::now();
 
@@ -558,31 +525,21 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 				<< with_label{"V", V} << '\n'
 				<< "cammera: theta=" << cam.theta << ", phi=" << cam.phi << ", distance=" << cam.distance << ", position=" << cam.position() << '\n';
 
-			// visualize terrain position
-			// cout << "terrains: ";
-			// for (terrain const & t : terrain_grid_list)
-			// 	cout << t.position * model_scale << " ";
-			// cout << "\n";
-
 			cout << "terrain_grid: ";
-			for (terrain const & t : terrains.terrains())
+			for (terrain const & t : terrains.iterate())
 				cout << t.position * model_scale << " ";
 			cout << "\n";
 		}
 
-		// assert(size(tiles) > 2 && "we expect at least one elevation and one satellite tiles");
 		assert(size(terrains) > 0 && "we expect at least one terrain to render something");
 
-		// auto const & first_elevation_tile = *begin(tiles);
-		// size_t const texture_width = get<1>(first_elevation_tile);  //= 716
-		// size_t const texture_height = get<2>(first_elevation_tile);
 		int const texture_width = terrains.elevation_tile_size,  //= 716
 			texture_height = terrains.elevation_tile_size;  //!< we should introduce texture_size
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);  //= 0.000107174
 
 		// TODO: we ned to do is before camera update
 		if (prev_cam_pos != cam.position()) {  // on camera move
-			for (terrain const & trn : terrains.terrains()/*terrain_grid_list*/) {  // find terrain under camera and set ground_height
+			for (terrain const & trn : terrains.iterate()) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
 					if (&trn != camera_terrain) {  // TODO: we wan to change only when we are over new terrain
 						g_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
@@ -595,7 +552,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			prev_cam_pos = cam.position();
 		}
 
-		for (terrain const & t : terrains.terrains()/*terrain_grid_list*/) {  // draw terrain grid
+		// TODO: we want to implement terrrain_grid_draw() to draw grid
+		for (terrain const & t : terrains.iterate()) {  // draw terrain grid
 			vec2 const model_pos = t.position * model_scale;
 			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale, model_scale, 1});  // T*S
 			mat4 const local_to_screen = P*V*M;
@@ -653,14 +611,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		SDL_GL_SwapWindow(window);
 	}
 	
-	// for(auto tile : tiles)  // delete textures
-	// 	glDeleteTextures(1, &get<0>(tile));
-
-	for (auto const & trn : terrains.terrains()) {   // TODO: move this into grid constructor
-		glDeleteTextures(1, &trn.elevation_map);
-		glDeleteTextures(1, &trn.satellite_map);
-	}
-
 	destroy_quad_mesh(vao, vbo, ibo);
 
 	ui.shutdown();
@@ -1044,26 +994,4 @@ void terrain_grid::load_tiles() {
 			_terrains.push_back(trn);
 		}
 	}
-}
-
-vector<tuple<GLuint, size_t, size_t>> read_tiles(size_t grid_rows, size_t grid_cols) {
-	vector<tuple<GLuint, size_t, size_t>> tiles;  // list of [elevation, satelite, ...] tiles for each terrain
-	for (size_t row = 0; row < grid_rows; ++row) {
-		for (size_t col = 0; col < grid_cols; ++col) {
-			string const height_tile_name = fmt::format("{}/{}{}_{}.tif", data_path.c_str(), elevation_tile_prefix, col, row);
-			assert(exists(height_tile_name) && "elevation tile not found");
-
-			auto const height_tile = create_texture_16b(height_tile_name);
-			assert(is_square(height_tile));
-			tiles.push_back(height_tile);
-
-			string const satellite_tile_name = fmt::format("{}/{}{}_{}.tif", data_path.c_str(), satellite_tile_prefix, col, row);
-			assert(exists(satellite_tile_name) && "satellite tile not found");
-
-			auto const satellite_tile = create_texture_8b(satellite_tile_name);
-			assert(is_square(satellite_tile));
-			tiles.push_back(satellite_tile);
-		}
-	}
-	return tiles;
 }
