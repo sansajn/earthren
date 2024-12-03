@@ -111,7 +111,7 @@ def build():
 	# grid of terrains
 	env.Program(['grid_of_terrains.cpp', above_terrain_common, 'flat_shader.cpp', 'quad.cpp',
 		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
-		'above_terrain_outline_shader_program.cpp', 'set_uniform.cpp', imgui])
+		'above_terrain_outline_shader_program.cpp', 'set_uniform.cpp', 'terrain_grid.cpp', imgui])
 
 	# other samples ...
 

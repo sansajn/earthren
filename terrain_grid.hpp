@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <ranges>
 #include <vector>
 #include <glm/vec2.hpp>
@@ -18,7 +19,10 @@ struct terrain_grid {
 	implement due to undestricted access and as a second step we can make it non member funnction if
 	it makes any sence. */
 
-	void load_tiles();  // TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
+	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
+	// TODO: we want to get rid og elevation_tile_prefix and satellite_tile_prefix they should be read from data_path config file
+	void load_tiles(std::filesystem::path const & data_path, std::string const & elevation_tile_prefix,
+		std::string const & satellite_tile_prefix);
 	[[nodiscard]] size_t size() const {return std::size(_terrains);}
 
 	/*! \returns Range to iterate through list of terrains.
