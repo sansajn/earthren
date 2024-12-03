@@ -471,7 +471,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			texture_height = terrains.elevation_tile_size;  //!< we should introduce texture_size
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);  //= 0.000107174
 
-		// TODO: we ned to do is before camera update
+		// TODO: create a function from following part of the code
+		// TODO: we ned to do it before camera update
 		if (prev_cam_pos != cam.position()) {  // on camera move
 			for (terrain const & trn : terrains.iterate()) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
@@ -529,7 +530,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glBindVertexArray(0);  // unbind VAO
 
-		flat_shader.use();  // render axis there
+		// render axis
+		flat_shader.use();
 
 		// we want to put axes to the left bottom corner in a camera space (so the position never change, just the rotation)
 		mat4 const cam_rot = mat4{glm::mat3{V}};
