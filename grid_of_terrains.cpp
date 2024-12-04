@@ -374,7 +374,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			texture_height = terrains.elevation_tile_size;  //!< we should introduce texture_size
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);  //= 0.000107174
 
-		// TODO: create a function from following part of the code
+		// TODO: create a function from following part of the code e.g. `camera_terrain = find_camera_terrain()`
 		// TODO: we ned to do it before camera update
 		if (prev_cam_pos != cam.position()) {  // on camera move
 			for (terrain const & trn : terrains.iterate()) {  // find terrain under camera and set ground_height
