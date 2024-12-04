@@ -165,13 +165,11 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	render_features const & features);
 
 //! Draws terrain light directions.
-void draw_terrain_light_directions(GLint lightdir_shader_program,
-	GLint lightdir_line_color_loc, GLint lightdir_heights_loc, GLint lightdir_height_map_size_loc,
-	GLint lightdir_height_scale_loc, GLint lightdir_local_to_screen_loc,
+void draw_terrain_light_directions(grid_of_terrains_lightdir_shader_program & shader,
 	terrain const & trn,
 	unsigned int element_count,
-	int elevation_tile_size,
 	float height_scale,
+	float elevation_scale,
 	mat4 local_to_screen);
 
 
@@ -234,19 +232,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// load shader program to visualize light direction
 	grid_of_terrains_lightdir_shader_program lightdir_shader;
+	assert(shader.position_location() == lightdir_shader.position_location() && "we expect the same position attribute locations (=0)");
 
-	string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
-		lightdir_gs = read_file(LIGHTDIR_GEOMETRY_SHADER_FILE),
-		lightdir_fs = read_file(LIGHTDIR_FRAGMENT_SHADER_FILE);
+	// string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
+	// 	lightdir_gs = read_file(LIGHTDIR_GEOMETRY_SHADER_FILE),
+	// 	lightdir_fs = read_file(LIGHTDIR_FRAGMENT_SHADER_FILE);
 
-	GLint const lightdir_shader_program = get_shader_program(lightdir_vs.c_str(), lightdir_fs.c_str(), lightdir_gs.c_str());
-	assert(shader.position_location() == glGetAttribLocation(lightdir_shader_program, "position"));
+	// GLint const lightdir_shader_program = get_shader_program(lightdir_vs.c_str(), lightdir_fs.c_str(), lightdir_gs.c_str());
+	// assert(shader.position_location() == glGetAttribLocation(lightdir_shader_program, "position"));
 
-	GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
-	GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
-	GLint const lightdir_height_scale_loc = glGetUniformLocation(lightdir_shader_program, "height_scale");
-	GLint const lightdir_local_to_screen_loc = glGetUniformLocation(lightdir_shader_program, "local_to_screen");
-	GLint const lightdir_line_color_loc = glGetUniformLocation(lightdir_shader_program, "fill_color");
+	// GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
+	// GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
+	// GLint const lightdir_height_scale_loc = glGetUniformLocation(lightdir_shader_program, "height_scale");
+	// GLint const lightdir_local_to_screen_loc = glGetUniformLocation(lightdir_shader_program, "local_to_screen");
+	// GLint const lightdir_line_color_loc = glGetUniformLocation(lightdir_shader_program, "fill_color");
 
 	// load shader program for wirefraame rendering
 	above_terrain_outline_shader_program outline_shader;
@@ -406,13 +405,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			}
 
 			if (features.show_lightdir) {  // render light directions
-				draw_terrain_light_directions(lightdir_shader_program,
-					lightdir_line_color_loc,
-					lightdir_heights_loc,
-					lightdir_height_map_size_loc,
-					lightdir_height_scale_loc,
-					lightdir_local_to_screen_loc,
-					t, element_count, texture_width, ui.height_scale, local_to_screen);
+				draw_terrain_light_directions(lightdir_shader, t,
+					element_count,
+					ui.height_scale, elevation_scale, local_to_screen);
 			}
 
 			if (features.show_outline) {  // render wireframe
@@ -522,27 +517,24 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 }
 
-void draw_terrain_light_directions(GLint lightdir_shader_program,
-	GLint lightdir_line_color_loc, GLint lightdir_heights_loc, GLint lightdir_height_map_size_loc,
-	GLint lightdir_height_scale_loc, GLint lightdir_local_to_screen_loc,
+void draw_terrain_light_directions(grid_of_terrains_lightdir_shader_program & shader,
 	terrain const & trn,
 	unsigned int element_count,
-	int elevation_tile_size,
 	float height_scale,
+	float elevation_scale,
 	mat4 local_to_screen) {
 
-	glUseProgram(lightdir_shader_program);
-
-	glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
+	shader.use();
+	shader.fill_color(rgb::yellow);
 
 	// bind height map
-	glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
+	shader.elevation_map(0);  // set sampler s to use texture unit 0
 	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
 	glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a texture to active texture unit (0)
 
-	glUniform2f(lightdir_height_map_size_loc, elevation_tile_size, elevation_tile_size);
-	glUniform1f(lightdir_height_scale_loc, height_scale);
-	glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
+	shader.elevation_scale(elevation_scale);
+	shader.height_scale(height_scale);
+	shader.local_to_screen(local_to_screen);
 
 	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 }

@@ -4,7 +4,7 @@
 #include <glm/mat4x4.hpp>
 #include <GLES3/gl32.h>
 
-/* TODO: there are three shader program implementationss there flat_shader_program, ...
+/* TODO: there are three shader program implementations there flat_shader_program, ...
 we should think to reuse common code. */
 struct above_terrain_outline_shader_program {
 	above_terrain_outline_shader_program();
@@ -18,7 +18,7 @@ struct above_terrain_outline_shader_program {
 	GLint position_location() const;
 
 private:
-	GLuint _prog;  //!< Shader program ID.
+	GLuint _prog;  //!< OpenGL shader program ID.
 	GLint _position,
 		_heights,
 		_elevation_scale,
