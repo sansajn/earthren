@@ -259,6 +259,16 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	mat4 local_to_screen,
 	render_features const & features);
 
+//! Draws terrain light directions.
+void draw_terrain_light_directions(GLint lightdir_shader_program,
+	GLint lightdir_line_color_loc, GLint lightdir_heights_loc, GLint lightdir_height_map_size_loc,
+	GLint lightdir_height_scale_loc, GLint lightdir_local_to_screen_loc,
+	terrain const & trn,
+	unsigned int element_count,
+	int elevation_tile_size,
+	float height_scale,
+	mat4 local_to_screen);
+
 
 bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 const & pos) {  // TODO: do we want camera instead of pos there? is_above would make more sence in that case
 	namespace bg = boost::geometry;
@@ -501,23 +511,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 					ui.height_scale, elevation_scale, features);
 			}
 
-			// TODO: we want draw funciton for that
-			// render light directions
-			if (features.show_lightdir) {
-				glUseProgram(lightdir_shader_program);
-
-				glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
-
-				// bind height map
-				glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
-				glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-				glBindTexture(GL_TEXTURE_2D, t.elevation_map);  // bind a texture to active texture unit (0)
-
-				glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
-				glUniform1f(lightdir_height_scale_loc, ui.height_scale);
-				glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
-
-				glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
+			if (features.show_lightdir) {  // render light directions
+				draw_terrain_light_directions(lightdir_shader_program,
+					lightdir_line_color_loc,
+					lightdir_heights_loc,
+					lightdir_height_map_size_loc,
+					lightdir_height_scale_loc,
+					lightdir_local_to_screen_loc,
+					t, element_count, texture_width, ui.height_scale, local_to_screen);
 			}
 
 			if (features.show_outline) {  // render wireframe
@@ -611,7 +612,6 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	mat4 local_to_screen,
 	render_features const & features) {
 
-	// render triangle outlines
 	shader.use();
 
 	shader.fill_color(color);
@@ -628,7 +628,15 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
 }
 
-void draw_terrain_light_directions() {
+void draw_terrain_light_directions(GLint lightdir_shader_program,
+	GLint lightdir_line_color_loc, GLint lightdir_heights_loc, GLint lightdir_height_map_size_loc,
+	GLint lightdir_height_scale_loc, GLint lightdir_local_to_screen_loc,
+	terrain const & trn,
+	unsigned int element_count,
+	int elevation_tile_size,
+	float height_scale,
+	mat4 local_to_screen) {
+
 	glUseProgram(lightdir_shader_program);
 
 	glUniform3fv(lightdir_line_color_loc, 1, value_ptr(rgb::yellow));
@@ -636,10 +644,10 @@ void draw_terrain_light_directions() {
 	// bind height map
 	glUniform1i(lightdir_heights_loc, 0);  // set sampler s to use texture unit 0
 	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-	glBindTexture(GL_TEXTURE_2D, t.elevation_map);  // bind a texture to active texture unit (0)
+	glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a texture to active texture unit (0)
 
-	glUniform2f(lightdir_height_map_size_loc, texture_width, texture_height);
-	glUniform1f(lightdir_height_scale_loc, ui.height_scale);
+	glUniform2f(lightdir_height_map_size_loc, elevation_tile_size, elevation_tile_size);
+	glUniform1f(lightdir_height_scale_loc, height_scale);
 	glUniformMatrix4fv(lightdir_local_to_screen_loc, 1, GL_FALSE, value_ptr(local_to_screen));
 
 	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
