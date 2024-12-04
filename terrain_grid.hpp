@@ -41,6 +41,8 @@ struct terrain_grid {
 	int grid_column_count = 2;
 	float quad_size = 1.0f;
 
+	static float camera_ground_height;  //!< Terrain ground height bellow camera. Camera needs to have an access to the property.
+
 	/* TODO: This is how wee work with elevations in a vertx shader program
 	float h = float(texture(heights, position.xy).r) * elevation_scale * height_scale; */
 	constexpr static int elevation_tile_max_value[4] = {

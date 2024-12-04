@@ -27,6 +27,8 @@ GLuint get_tid(tuple<GLuint, size_t, size_t> const & tile) {  //!< get OpenGL te
 
 }  // namespace
 
+float terrain_grid::camera_ground_height = 0.0f;
+
 void terrain_grid::load_tiles(path const & data_path, string const & elevation_tile_prefix,
 	string const & satellite_tile_prefix) {
 

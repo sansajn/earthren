@@ -50,6 +50,7 @@ i: print transformations info */
 #include "height_overlap_shader_program.hpp"
 #include "above_terrain_outline_shader_program.hpp"
 #include "terrain_grid.hpp"
+#include "terrain_camera.hpp"
 
 // to implement is_above()
 #include <boost/geometry/algorithms/intersects.hpp>
@@ -93,14 +94,7 @@ path const data_path = "data/gen/height_overlap";
 constexpr string elevation_tile_prefix = "plzen_elev_",
 	satellite_tile_prefix = "plzen_rgb_";
 
-void verbose_signal_handler(int signal) {
-	cout << "signal '" << strsignal(signal) << "' (" << signal << ") caught\n"
-		<< "stacktrace:\n"
-		<< boost::stacktrace::stacktrace{} 
-		<< endl;
-
-	exit(signal);
-}
+void verbose_signal_handler(int signal);
 
 constexpr float pi = glm::pi<float>();
 
@@ -136,92 +130,6 @@ struct render_features {  // list of selected rendering features
 		calculate_shades;
 };
 
-float g_ground_height = 0.441305f;  // TODO: this should not be there, but part of something
-
-/*! Orbital camera over a terrain.
-\code
-map_camera cam{20.0f};
-cam.look_at = vec2{0, 0};
-
-while (true) {  // loop
-	// handle events
-	cam.update();  // update
-
-	mat4 V = cam.vew();
-	// render
-}
-\endcode */
-struct map_camera {
-	float theta,  //!< x-axis camera rotation in rad
-		phi;  //!< z-axis camera rotation in rad
-	float distance;  //!< camera distance from ground
-
-	glm::vec2 look_at;  //!< look-at point on a map
-
-	explicit map_camera(float d = 1.0f);
-	[[nodiscard]] glm::mat4 const & view() const {return _view;}
-	[[nodiscard]] glm::vec3 forward() const;  //!< gets camera forward direction
-	[[nodiscard]] glm::vec3 position() const {return _position;}
-
-	/*! \note view(), forward() or position() result available after the first update() called. */
-	void update();
-
-private:
-	glm::vec3 _position;
-	glm::mat4 _view;  //!< Camera view transformation matrix.
-	float _prev_ground_height;
-};
-
-map_camera::map_camera(float d)
-	: theta{0},
-	phi{0},
-	distance{d},
-	look_at{0, 0},
-	_position{0},
-	_prev_ground_height{g_ground_height} {}
-
-void map_camera::update() {
-	constexpr float height_offset = 0.1f;
-
-	//  to prevent popping camera in case ground is closer
-	float const ground_height = std::max(_prev_ground_height, g_ground_height);
-	_prev_ground_height = ground_height;
-
-	// we do not want to let distance < 0
-	distance = std::max(0.0f, distance);
-
-	vec3 const p0 = {look_at, ground_height};
-
-	vec3 const px = {1, 0, 0},
-		py = {0, 1, 0},
-		pz = {0, 0, 1};
-
-	float const cp = cos(phi),
-		sp = sin(phi),
-		ct = cos(theta),
-		st = sin(theta);
-
-	vec3 const cx = px*cp + py*sp,
-		cy = -px*sp*ct + py*cp*ct + pz*st,
-		cz = px*sp*st - py*cp*st + pz*ct;  // z-axis directional vector
-
-	_position = p0 + cz * distance;
-	_position.z = std::max(_position.z, ground_height + height_offset);  // clamp position.z
-
-	mat4 const V = {
-		cx.x, cy.x, cz.x, 0,
-		cx.y, cy.y, cz.y, 0,
-		cx.z, cy.z, cz.z, 0,
-		0, 0, 0, 1
-	};
-
-	_view = translate(V, -_position);
-}
-
-vec3 map_camera::forward() const {
-	return normalize(-vec3{_view[2]});
-}
-
 /*! Process user input.
 \returns false in case user want to quit, otherwise true. */
 template <typename Camera>
@@ -231,7 +139,7 @@ bool input(Camera & cam, input_mode & mode, render_features & features,
 // input handling functions
 void input_render_features(SDL_Event const & event, render_features & features);
 void input_control_mode(SDL_Event const & event, input_mode & mode, input_events & events);  //!< handle pan/rotate modes
-void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & mode,
+void input_camera(SDL_Event const & event, terrain_camera & cam, input_mode const & mode,
 	input_events & events);  //!< handle camera movement, rotations
 void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
 	input_events & events);  //!< handle camera movement, rotations
@@ -381,7 +289,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	auto [vao, vbo, ibo, element_count] = create_quad_mesh(shader.position_location(), ui.quad_resolution);
 
 	// camera related stuff
-	map_camera cam{20.0f};
+	terrain_camera cam{20.0f};
 	cam.look_at = vec2{0, 0};
 
 	free_camera cam_detail{radians(60.f), WIDTH/(float)HEIGHT, 0.01f, 1000.f};
@@ -487,9 +395,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			for (terrain const & trn : terrains.iterate()) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
 					if (&trn != camera_terrain) {  // TODO: we wan to change only when we are over new terrain
-						g_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
+						terrain_grid::camera_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
 						camera_terrain = &trn;  // save for later comparison
-						cout << "ground_height=" << g_ground_height << '\n';
+						cout << "camera-ground-height=" << terrain_grid::camera_ground_height << '\n';
 					}
 					break;
 				}
@@ -757,7 +665,7 @@ void input_control_mode(SDL_Event const & event, input_mode & mode, input_events
 	}
 }
 
-void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & mode,
+void input_camera(SDL_Event const & event, terrain_camera & cam, input_mode const & mode,
 	input_events & events) {
 	// distance
 	if (event.type == SDL_MOUSEWHEEL) {
@@ -777,11 +685,11 @@ void input_camera(SDL_Event const & event, map_camera & cam, input_mode const & 
 	if (event.type == SDL_KEYDOWN) {
 		switch (event.key.keysym.sym) {
 		case SDLK_c:  // reset camera
-			cam = map_camera{20.0f};
+			cam = terrain_camera{20.0f};
 			cam.look_at = {0, 0};
 			break;
 		case SDLK_p:  // set camera to predefined position
-			cam = map_camera{2.97287f};
+			cam = terrain_camera{2.97287f};
 			cam.look_at = {0, 0};
 			cam.theta = 0.599999f;
 			cam.phi = 0.62;
@@ -877,4 +785,13 @@ void update(free_camera & cam, input_mode const & mode, float dt) {
 		cam.position += cam.right() * speed * dt;
 
 	cam.update();  // update camera
+}
+
+void verbose_signal_handler(int signal) {
+	cout << "signal '" << strsignal(signal) << "' (" << signal << ") caught\n"
+		<< "stacktrace:\n"
+		<< boost::stacktrace::stacktrace{}
+		<< endl;
+
+	exit(signal);
 }

@@ -236,6 +236,8 @@ set_uniform.hpp
 shader.cpp
 shader.hpp
 sinxy_heights.cpp
+terrain_camera.cpp
+terrain_camera.hpp
 terrain_grid.cpp
 terrain_grid.hpp
 terrain_mesh.cpp
