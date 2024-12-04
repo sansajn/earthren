@@ -49,6 +49,7 @@ i: print transformations info */
 #include "flat_shader.hpp"
 #include "height_overlap_shader_program.hpp"
 #include "above_terrain_outline_shader_program.hpp"
+#include "grid_of_terrains_lightdir_shader_program.hpp"
 #include "terrain_grid.hpp"
 #include "terrain_camera.hpp"
 
@@ -232,6 +233,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	height_overlap_shader_program shader;
 
 	// load shader program to visualize light direction
+	grid_of_terrains_lightdir_shader_program lightdir_shader;
+
 	string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
 		lightdir_gs = read_file(LIGHTDIR_GEOMETRY_SHADER_FILE),
 		lightdir_fs = read_file(LIGHTDIR_FRAGMENT_SHADER_FILE);

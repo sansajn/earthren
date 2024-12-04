@@ -30,6 +30,9 @@ geoms_plane.gs
 geoms_plane_facen.vs
 geoms_plane_normal.vs
 grid_of_terrains.cpp
+grid_of_terrains_lightdir.vs
+grid_of_terrains_lightdir_shader_program.cpp
+grid_of_terrains_lightdir_shader_program.hpp
 gs_triangle_broken.cpp
 gs_triangle_broken.gs
 gs_triangle_broken.vs
