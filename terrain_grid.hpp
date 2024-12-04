@@ -13,6 +13,10 @@ struct terrain {
 	float elevation_min;  // TODO: use terrain related value there, TODO: rename to eelevation_max
 };
 
+/*! Function to find out whether position is above a terrain.
+E.g. To figure out whether camera is above a terrain. */
+bool is_above(terrain const & trn, float quad_size, float model_scale, glm::vec3 const & pos);
+
 // TODO: elevation_min data are missing during load_tiles in a grid
 struct terrain_grid {
 	/* TODO: should be read_tiles member of terrain_grid? I think in the first step it is easier to

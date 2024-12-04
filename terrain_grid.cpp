@@ -7,10 +7,14 @@
 #include "texture.hpp"
 #include "terrain_grid.hpp"
 
+// to implement is_above()
+#include <boost/geometry/algorithms/intersects.hpp>
+#include "geometry/box2.hpp"
+
 using std::string, std::to_string;
 using std::filesystem::path;
 using std::tuple, std::get;
-using glm::vec2;
+using glm::vec2, glm::vec3;
 
 namespace {  //!< Helper functions.
 
@@ -26,6 +30,20 @@ GLuint get_tid(tuple<GLuint, size_t, size_t> const & tile) {  //!< get OpenGL te
 }
 
 }  // namespace
+
+bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 const & pos) {  // TODO: do we want camera instead of pos there? is_above would make more sence in that case
+	namespace bg = boost::geometry;
+
+	// calculate terrain bounding box (it is axis aligned)
+	// the formula is `(position + quad_size) * model_scale`
+	vec2 const min_corner = trn.position * model_scale,
+		max_corner = (trn.position + quad_size) * model_scale;
+
+	geom::box2 const tile_area = {min_corner, max_corner};
+
+	return bg::intersects(vec2{pos}, tile_area);
+}
+
 
 float terrain_grid::camera_ground_height = 0.0f;
 
