@@ -234,19 +234,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	grid_of_terrains_lightdir_shader_program lightdir_shader;
 	assert(shader.position_location() == lightdir_shader.position_location() && "we expect the same position attribute locations (=0)");
 
-	// string const lightdir_vs = read_file(LIGHTDIR_VERTEX_SHADER_FILE),
-	// 	lightdir_gs = read_file(LIGHTDIR_GEOMETRY_SHADER_FILE),
-	// 	lightdir_fs = read_file(LIGHTDIR_FRAGMENT_SHADER_FILE);
-
-	// GLint const lightdir_shader_program = get_shader_program(lightdir_vs.c_str(), lightdir_fs.c_str(), lightdir_gs.c_str());
-	// assert(shader.position_location() == glGetAttribLocation(lightdir_shader_program, "position"));
-
-	// GLint const lightdir_heights_loc = glGetUniformLocation(lightdir_shader_program, "heights");
-	// GLint const lightdir_height_map_size_loc = glGetUniformLocation(lightdir_shader_program, "height_map_size");
-	// GLint const lightdir_height_scale_loc = glGetUniformLocation(lightdir_shader_program, "height_scale");
-	// GLint const lightdir_local_to_screen_loc = glGetUniformLocation(lightdir_shader_program, "local_to_screen");
-	// GLint const lightdir_line_color_loc = glGetUniformLocation(lightdir_shader_program, "fill_color");
-
 	// load shader program for wirefraame rendering
 	above_terrain_outline_shader_program outline_shader;
 	assert(shader.position_location() == outline_shader.position_location() && "we expect the same position attribute locations (=0)");
