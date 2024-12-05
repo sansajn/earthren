@@ -87,7 +87,7 @@ path const LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 
 path const config_file_path = "grid_of_terrains.ini";
 
-path const data_path = "data/gen/height_overlap";
+path const data_path = "data/gen/grid_of_terrains";
 constexpr string elevation_tile_prefix = "plzen_elev_",
 	satellite_tile_prefix = "plzen_rgb_";
 
