@@ -11,6 +11,10 @@
 #include <boost/geometry/algorithms/intersects.hpp>
 #include "geometry/box2.hpp"
 
+// to load dataset description file
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+
 using std::string, std::to_string;
 using std::filesystem::path;
 using std::tuple, std::get;
@@ -60,6 +64,8 @@ void terrain_grid::load_tiles(path const & data_path, string const & elevation_t
 		return;
 	}
 
+	load_description(data_path);  // read dataaset description file first
+
 	// - make a list of tiles froom tiles_directory
 	// - we expect `.+_elev_C_R.tif` and `.+_rgb_C_R.tif` tile files there
 	for (auto const & dir_entry: directory_iterator{tile_directory}) {
@@ -95,17 +101,18 @@ void terrain_grid::load_tiles(path const & data_path, string const & elevation_t
 			// - calculate terrain word position
 			int const column = stoi(column_str),
 				row = stoi(row_str);
-			vec2 word_pos = to_word_position(column, row, grid_column_count, quad_size);
+			vec2 word_pos = to_word_position(column, row, grid_size(), quad_size);
 			spdlog::info("    word_pos={}", to_string(word_pos));
 
 			// - load elevation tile
 			auto const elevation_tile = create_texture_16b(file);
-			assert(is_square(elevation_tile));
-			elevation_tile_size = get<1>(elevation_tile);  // TODO: we do not want set this for every file
+			assert(is_square(elevation_tile) && "we expect square elevation tiles");
+			assert(_elevation_tile_size == get<1>(elevation_tile) && "unexpected elevation tile size");
 
 			// - load satellite tile
 			auto const satellite_tile = create_texture_8b(satellite_path);
 			assert(is_square(satellite_tile));
+			// TODO: check satellite tile size
 
 			// - create terrain instance and filll maps and position
 			terrain trn;
@@ -114,13 +121,30 @@ void terrain_grid::load_tiles(path const & data_path, string const & elevation_t
 			trn.position = word_pos;
 
 			// - calculate elevation max value
-			trn.elevation_min = elevation_tile_max_value[column + row*grid_column_count];
+			trn.elevation_min = elevation_tile_max_value[column + row*_grid_size];
 
 			// - add to the list of terrains
 			_terrains.push_back(trn);
 		}
 	}
 }
+
+void terrain_grid::load_description(path const & data_path) {
+	boost::property_tree::ptree config;
+	boost::property_tree::read_json(data_path/"dataset.json", config);
+
+	/* TODO properties are mandatory otherwisee
+	terminate called after throwing an instance of 'boost::wrapexcept<boost::property_tree::ptree_bad_path>'
+		what():  No such node (elevation.tile_prefix) */
+
+	_grid_size = config.get<int>("grid_size");
+	_elevation_tile_prefix = config.get<string>("elevation.tile_prefix");
+	_elevation_pixel_size = config.get<double>("elevation.pixel_size");
+	_elevation_tile_size = config.get<int>("elevation.tile_size");
+	_satellite_tile_prefix = config.get<string>("satellite.tile_prefix");
+	_satellite_tile_size = config.get<int>("satellite.tile_size");
+}
+
 
 namespace {
 

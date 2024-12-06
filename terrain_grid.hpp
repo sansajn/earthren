@@ -35,14 +35,15 @@ struct terrain_grid {
 	// ...
 	for (terrain const & terrains.iterate()) {...}
 	\endcode */
-	auto iterate() const {  //!< \returns list of terrains as range
+	[[nodiscard]] auto iterate() const {  //!< \returns list of terrains as range
 		return std::ranges::subrange{std::begin(_terrains), std::end(_terrains)};
 	}
 
-	// TODO: some basic tile informations
-	int elevation_tile_size;  //= 716, TODO: this is set during load_tiles()
+	[[nodiscard]] int grid_size() const {return _grid_size;}
+	[[nodiscard]] int elevation_tile_size() const {return _elevation_tile_size;}
+	[[nodiscard]] double elevation_pixel_size() const {return _elevation_pixel_size;}
 
-	int grid_column_count = 2;
+	// TODO: some basic tile informations
 	float quad_size = 1.0f;
 
 	static float camera_ground_height;  //!< Terrain ground height bellow camera. Camera needs to have an access to the property.
@@ -62,5 +63,13 @@ struct terrain_grid {
 	}
 
 private:
-	std::vector<terrain> _terrains;  // TODO: we need cleanup of textures in destructor
+	void load_description(std::filesystem::path const & data_path);
+
+	std::vector<terrain> _terrains;
+	int _grid_size,
+		_elevation_tile_size,
+		_satellite_tile_size;
+	std::string _elevation_tile_prefix,
+		_satellite_tile_prefix;
+	double _elevation_pixel_size;
 };

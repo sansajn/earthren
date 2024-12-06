@@ -194,6 +194,7 @@ GLuint push_axes() {
 	return push_data(axis_verts, sizeof(axis_verts));
 }
 
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
@@ -282,9 +283,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// create grid of terrains
 	terrain_grid terrains;
-	terrains.grid_column_count = grid_cols;
-	terrains.quad_size = quad_size;  // TODO: we need API for quad_size and grid_column_count
-	terrains.load_tiles(data_path, elevation_tile_prefix, satellite_tile_prefix);
+	terrains.load_tiles(data_path, elevation_tile_prefix, satellite_tile_prefix);  // TODO: we can remove prefix variables
 	spdlog::info("terrain-count={}", terrains.size());
 
 	auto t_prev = steady_clock::now();
@@ -357,8 +356,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		assert(size(terrains) > 0 && "we expect at least one terrain to render something");
 
-		int const texture_width = terrains.elevation_tile_size,  //= 716
-			texture_height = terrains.elevation_tile_size;  //!< we should introduce texture_size
+		int const texture_width = terrains.elevation_tile_size(),  //= 716
+			texture_height = terrains.elevation_tile_size();  //!< we should introduce texture_size
 		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);  //= 0.000107174
 
 		// TODO: create a function from following part of the code e.g. `camera_terrain = find_camera_terrain()`
