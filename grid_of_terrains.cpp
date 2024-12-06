@@ -77,7 +77,6 @@ constexpr GLuint WIDTH = 800,
 
 constexpr float TERRAIN_SIZE_SCALE = 2.0f;
 constexpr float TERRAIN_HEIGHT_SCALE = 10.0f;
-constexpr float elevation_pixel_size = 26.063200588611451;  // this is tile dependent, use gdalinfo to figure it out
 
 constexpr unsigned DEFAULT_QUAD_RESOLOTION = 100;  // for 100x100 vertices quad
 
@@ -355,7 +354,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		int const texture_width = terrains.elevation_tile_size(),  //= 716
 			texture_height = terrains.elevation_tile_size();  //!< we should introduce texture_size
-		float const elevation_scale = model_scale / (elevation_pixel_size * texture_width);  //= 0.000107174
+		float const elevation_scale = model_scale / (terrains.elevation_pixel_size() * texture_width);  //= 0.000107174
 
 		// TODO: create a function from following part of the code e.g. `camera_terrain = find_camera_terrain()`
 		// TODO: we ned to do it before camera update
