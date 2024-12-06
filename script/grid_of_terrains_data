@@ -5,6 +5,7 @@
 set -e
 
 TARGET_PATH="../data/gen/grid_of_terrains"
+GRID_SIZE=4
 
 # if conda available activate earthren environment
 if command -v conda >/dev/null 2>&1; then
@@ -26,7 +27,7 @@ mv ./out/plzen_*.tif $TARGET_PATH
 echo "installed to $TARGET_PATH"
 
 echo "--> dataset description"
-python3 create_dataset_desc.py $TARGET_PATH
+python3 create_dataset_desc.py $TARGET_PATH $GRID_SIZE
 
 echo "--> clean"
 rm -r ./out

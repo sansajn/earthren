@@ -1,11 +1,10 @@
 import os, sys, json, subprocess
 
-grid_size = 2
-
 def main(args):
-	assert len(args) > 1, 'we expect dataset directory path as command line argument'
+	assert len(args) > 2, 'we expect dataset directory path as command line argument and grid size'
 	dataset_path = args[1]
-	
+	grid_size = int(args[2])
+
 	# Initial dataset configuration file structure
 	config = {
 		"// Describes dataset directory": "",
