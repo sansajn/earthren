@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <map>
 #include <ranges>
 #include <vector>
 #include <glm/vec2.hpp>
@@ -42,17 +43,9 @@ struct terrain_grid {
 	[[nodiscard]] int elevation_tile_size() const {return _elevation_tile_size;}
 	[[nodiscard]] double elevation_pixel_size() const {return _elevation_pixel_size;}
 
-	// TODO: some basic tile informations
 	float quad_size = 1.0f;
 
 	static float camera_ground_height;  //!< Terrain ground height bellow camera. Camera needs to have an access to the property.
-
-	/* TODO: This is how wee work with elevations in a vertx shader program
-	float h = float(texture(heights, position.xy).r) * elevation_scale * height_scale; */
-	constexpr static int elevation_tile_max_value[4] = {
-		564, 726,
-		625, 805
-	};
 
 	~terrain_grid() {
 		for (terrain const & trn : _terrains) {  // TODO: terrain is now owner of textures so it is terrain responsibility to delete textures
@@ -63,6 +56,7 @@ struct terrain_grid {
 
 private:
 	void load_description(std::filesystem::path const & data_path);
+	int elevation_maxval(std::filesystem::path const & filename) const;
 
 	std::vector<terrain> _terrains;
 	int _grid_size,
@@ -71,4 +65,8 @@ private:
 	std::string _elevation_tile_prefix,
 		_satellite_tile_prefix;
 	double _elevation_pixel_size;
+
+	/* TODO: This is how wee work with elevations in a vertx shader program
+	float h = float(texture(heights, position.xy).r) * elevation_scale * height_scale; */
+	std::map<std::filesystem::path, int> _elevation_tile_max_value;
 };

@@ -2,6 +2,7 @@
 #include <regex>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <spdlog/spdlog.h>
 #include "geometry/glmprint.hpp"
 #include "texture.hpp"
@@ -15,8 +16,10 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
+using std::map;
 using std::string, std::to_string;
 using std::filesystem::path;
+using std::pair;
 using std::tuple, std::get;
 using glm::vec2, glm::vec3;
 
@@ -68,7 +71,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 	// - make a list of tiles froom tiles_directory
 	// - we expect `.+_elev_C_R.tif` and `.+_rgb_C_R.tif` tile files there
 	for (auto const & dir_entry: directory_iterator{tile_directory}) {
-		path const & file = dir_entry.path();
+		path const & file = dir_entry.path();  // full path tile filename
 		spdlog::info(file.c_str());
 
 		// - for each elevation tile
@@ -120,7 +123,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 			trn.position = word_pos;
 
 			// - calculate elevation max value
-			trn.elevation_min = elevation_tile_max_value[column + row*_grid_size];
+			trn.elevation_min = _elevation_tile_max_value.at(file.filename());  // TODO: can thrrow std::out_of_range
 
 			// - add to the list of terrains
 			_terrains.push_back(trn);
@@ -129,7 +132,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 }
 
 void terrain_grid::load_description(path const & data_path) {
-	boost::property_tree::ptree config;
+	boost::property_tree::ptree config;  // TODO: rename to dataset
 	boost::property_tree::read_json(data_path/"dataset.json", config);
 
 	/* TODO properties are mandatory otherwisee
@@ -142,6 +145,10 @@ void terrain_grid::load_description(path const & data_path) {
 	_elevation_tile_size = config.get<int>("elevation.tile_size");
 	_satellite_tile_prefix = config.get<string>("satellite.tile_prefix");
 	_satellite_tile_size = config.get<int>("satellite.tile_size");
+
+	// create list of elevation max values
+	for (auto const & kv : config.get_child("files"))  // TODO: this is work for transsform
+		_elevation_tile_max_value.insert(pair{path{kv.first}, kv.second.get<int>("maxval")});  // TODO: emplace?
 }
 
 
