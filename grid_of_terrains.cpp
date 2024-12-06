@@ -245,11 +245,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLuint const axes_position_vbo = push_axes();
 	axes_model axes{axes_position_vbo};
 
-	// load textures
-	constexpr size_t grid_rows = 2,
-		grid_cols = 2;
-	assert((grid_rows % 2) == 0 && (grid_cols % 2) == 0);
-
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
 
@@ -277,10 +272,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	unsigned quad_resolution = ui.quad_resolution;  // save quad resolution to detect resolution changes
 
-	// create grid of terrains
+	// create grid of terrains (load textures, ...)
 	terrain_grid terrains;
 	terrains.load_tiles(data_path);
-	spdlog::info("terrain-count={}", terrains.size());
+	spdlog::info("we have {} terrains loaded", terrains.size());
 
 	auto t_prev = steady_clock::now();
 
