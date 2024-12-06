@@ -51,8 +51,7 @@ bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 cons
 
 float terrain_grid::camera_ground_height = 0.0f;
 
-void terrain_grid::load_tiles(path const & data_path, string const & elevation_tile_prefix,
-	string const & satellite_tile_prefix) {
+void terrain_grid::load_tiles(path const & data_path) {
 
 	// TODO: the implementation produce unordered list of terrains (which can be a performance issue during the rendering because you want to access adjacent terrains).
 	using std::filesystem::directory_iterator;
@@ -73,7 +72,7 @@ void terrain_grid::load_tiles(path const & data_path, string const & elevation_t
 		spdlog::info(file.c_str());
 
 		// - for each elevation tile
-		if (file.filename().string().starts_with(elevation_tile_prefix)) {  // TODO: can we use range algorithm there?
+		if (file.filename().string().starts_with(_elevation_tile_prefix)) {  // TODO: can we use range algorithm there?
 			// TODO: introdudee elevation_file
 			spdlog::info("-> {}", file.c_str());
 
@@ -91,7 +90,7 @@ void terrain_grid::load_tiles(path const & data_path, string const & elevation_t
 			// - check we have coresponding rgb file
 			string const column_str = what[1].str(),
 				row_str = what[2].str();
-			path const satellite_path = tile_directory / path{fmt::format("{}{}_{}.tif", satellite_tile_prefix, column_str, row_str)};
+			path const satellite_path = tile_directory / path{fmt::format("{}{}_{}.tif", _satellite_tile_prefix, column_str, row_str)};
 			if (!exists(satellite_path)) {
 				spdlog::info("corresponding satellite data for elevation tile ('{}') not found", file.c_str());
 				continue;
@@ -101,7 +100,7 @@ void terrain_grid::load_tiles(path const & data_path, string const & elevation_t
 			// - calculate terrain word position
 			int const column = stoi(column_str),
 				row = stoi(row_str);
-			vec2 word_pos = to_word_position(column, row, grid_size(), quad_size);
+			vec2 word_pos = to_word_position(column, row, _grid_size, quad_size);
 			spdlog::info("    word_pos={}", to_string(word_pos));
 
 			// - load elevation tile

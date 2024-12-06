@@ -85,11 +85,8 @@ path const LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_GEOMETRY_SHADER_FILE = "to_line.gs",
 	LIGHTDIR_FRAGMENT_SHADER_FILE = "colored.fs";
 
-path const config_file_path = "grid_of_terrains.ini";
-
-path const data_path = "data/gen/grid_of_terrains";
-constexpr string elevation_tile_prefix = "plzen_elev_",
-	satellite_tile_prefix = "plzen_rgb_";
+path const config_file_path = "grid_of_terrains.ini",
+	data_path = "data/gen/grid_of_terrains";
 
 void verbose_signal_handler(int signal);
 
@@ -283,7 +280,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	// create grid of terrains
 	terrain_grid terrains;
-	terrains.load_tiles(data_path, elevation_tile_prefix, satellite_tile_prefix);  // TODO: we can remove prefix variables
+	terrains.load_tiles(data_path);
 	spdlog::info("terrain-count={}", terrains.size());
 
 	auto t_prev = steady_clock::now();
