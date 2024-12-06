@@ -25,6 +25,9 @@ mkdir -p $TARGET_PATH
 mv ./out/plzen_*.tif $TARGET_PATH
 echo "installed to $TARGET_PATH"
 
+echo "--> dataset description"
+python3 create_dataset.py $TARGET_PATH
+
 echo "--> clean"
 rm -r ./out
 
