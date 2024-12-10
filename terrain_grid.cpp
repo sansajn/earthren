@@ -26,7 +26,7 @@ using glm::vec2, glm::vec3;
 namespace {  //!< Helper functions.
 
 //! Helper function to calculate word position from grid (coumn, row) position.
-vec2 to_word_position(int column, int row, int grid_column_count, float quad_size);
+vec2 to_word_position(int column, int row, int grid_size, float quad_size);
 
 bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
 	return get<1>(tile) == get<2>(tile);
@@ -103,7 +103,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 			// - calculate terrain word position
 			int const column = stoi(column_str),
 				row = stoi(row_str);
-			vec2 word_pos = to_word_position(column, row, _grid_size, quad_size);
+			vec2 const word_pos = to_word_position(column, row, _grid_size, quad_size);
 			spdlog::info("    word_pos={}", to_string(word_pos));
 
 			// - load elevation tile
@@ -121,6 +121,8 @@ void terrain_grid::load_tiles(path const & data_path) {
 			trn.elevation_map = get_tid(elevation_tile);
 			trn.satellite_map = get_tid(satellite_tile);
 			trn.position = word_pos;
+			trn.grid_c = column;
+			trn.grid_r = row;
 
 			// - calculate elevation max value
 			trn.elevation_min = _elevation_tile_max_value.at(file.filename());  // TODO: can thrrow std::out_of_range
@@ -154,8 +156,8 @@ void terrain_grid::load_description(path const & data_path) {
 
 namespace {
 
-vec2 to_word_position(int column, int row, int grid_column_count, float quad_size) {
-	vec2 const position = vec2{column, -row} * quad_size - vec2{grid_column_count, 0} * quad_size*0.5f;
+vec2 to_word_position(int column, int row, int grid_size, float quad_size) {
+	vec2 const position = vec2{column, -row} * quad_size - vec2{grid_size, -(grid_size-(2*1))} * quad_size*0.5f;
 	return position;
 }
 

@@ -12,6 +12,8 @@ struct terrain {
 		satellite_map;
 	glm::vec2 position;  //!< Terrain word position (within thee grid).
 	float elevation_min;  // TODO: use terrain related value there, TODO: rename to eelevation_max
+
+	int grid_c, grid_r; // TODO: grid position for debug
 };
 
 /*! Function to find out whether position is above a terrain.

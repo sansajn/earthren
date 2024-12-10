@@ -1,5 +1,5 @@
-# Script creates four tiles from input tile with 1px overlapping to get rid of artifacts during terrain rendering. Workins with GDAL 3.4.3. Tiles are split from top left corner and saved as tile_{C}_{R}.jpg, where C represents column and R row of a 2x2 grid. This means tile_0_0.tif shows top-left quadrant tile_1_0.tif top-right quadrant, .... Works with GDAL 3.4.3 or 3.8.4.
-# usage: split_half_overlap.py [input-source-tif-file]
+# Script creates four tiles from input tile with 1px overlapping to get rid of artifacts during terrain rendering. Tiles are split from top left corner and saved as tile_{C}_{R}.jpg, where C represents column and R row of a 2x2 grid. This means tile_0_0.tif shows top-left quadrant tile_1_0.tif top-right quadrant, .... Works with GDAL 3.4.3 or 3.8.4.
+# usage: split_quarter_overlap.py [input-source-tif-file]
 from osgeo import gdal
 import math
 import sys

@@ -279,7 +279,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	auto t_prev = steady_clock::now();
 
-	vec3 prev_cam_pos = cam.position();  // to detect camera position change between the looop iteratoins
+	vec3 prev_cam_pos = cam.position();  // to detect camera grid_column_countposition change between the looop iteratoins
 
 	terrain const * camera_terrain = nullptr;
 
@@ -341,7 +341,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 			cout << "terrain_grid: ";
 			for (terrain const & t : terrains.iterate())
-				cout << t.position * model_scale << " ";
+				cout << "(" <<  t.grid_c << "," << t.grid_r << ") -> " << t.position * model_scale << " ";
 			cout << "\n";
 		}
 
