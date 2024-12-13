@@ -42,4 +42,7 @@ terrain_mesh.ini
 terrain_scale
 terrain_scale.ini
 above_terrain
+above_terrain.ini
 core_dump/
+grid_of_terrains
+grid_of_terrains.ini

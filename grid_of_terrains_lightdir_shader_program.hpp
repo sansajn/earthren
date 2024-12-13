@@ -4,11 +4,11 @@
 #include <glm/mat4x4.hpp>
 #include <GLES3/gl32.h>
 
-/* TODO: there are three shader program implementations there flat_shader_program, ...
+/* TODO: there are four shader program implementations there flat_shader_program, ...
 we should think to reuse common code. */
-struct above_terrain_outline_shader_program {
-	above_terrain_outline_shader_program();
-	~above_terrain_outline_shader_program();
+struct grid_of_terrains_lightdir_shader_program {
+	grid_of_terrains_lightdir_shader_program();
+	~grid_of_terrains_lightdir_shader_program();
 	void use() const;
 	void local_to_screen(glm::mat4 const & T);
 	void elevation_map(int texture_unit_id);  //!< Set elevation data as OpenGL texture.

@@ -13,9 +13,16 @@ using std::tuple, std::byte,
 	std::move, std::swap,
 	std::numeric_limits;
 
+// Custom warning handler (does nothing to suppress warnings)
+static void suppress_tiff_warnings(char const * module, char const * fmt, va_list ap) {
+	// Do nothing, effectively suppressing warnings
+}
+
 tuple<unique_ptr<byte>, size_t, size_t> load_tiff(path const & tiff_file) {
 	ifstream fin{tiff_file};
 	assert(fin.is_open());
+
+	TIFFSetWarningHandler(suppress_tiff_warnings);
 
 	TIFF * tiff = TIFFStreamOpen("memory", &fin);
 	assert(tiff);
@@ -83,6 +90,8 @@ unique_ptr<byte> flip_copy(byte const * pixels, size_t w, size_t h, size_t image
 tuple<unique_ptr<byte>, tiff_data_desc> load_tiff_desc(path const & tiff_file, bool flip) {
 	ifstream fin{tiff_file};
 	assert(fin.is_open());
+
+	TIFFSetWarningHandler(suppress_tiff_warnings);
 
 	TIFF * tiff = TIFFStreamOpen("memory", &fin);
 	assert(tiff);

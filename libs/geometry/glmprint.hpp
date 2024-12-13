@@ -161,3 +161,10 @@ inline std::ostream & operator<<(std::ostream & o, glm::vec4 const & v)
 	o << "(" << v.x << ", " << v.y << ", " << v.z << ", " << v.w << ")";
 	return o;
 }
+
+/*! to_string() helpers */
+inline std::string to_string(glm::vec2 const & v) {
+	std::ostringstream os;
+	os << "(" << v.x << ", " << v.y << ")";
+	return os.str();
+}

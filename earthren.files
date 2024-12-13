@@ -29,6 +29,10 @@ geoms_plane.cpp
 geoms_plane.gs
 geoms_plane_facen.vs
 geoms_plane_normal.vs
+grid_of_terrains.cpp
+grid_of_terrains_lightdir.vs
+grid_of_terrains_lightdir_shader_program.cpp
+grid_of_terrains_lightdir_shader_program.hpp
 gs_triangle_broken.cpp
 gs_triangle_broken.gs
 gs_triangle_broken.vs
@@ -235,6 +239,10 @@ set_uniform.hpp
 shader.cpp
 shader.hpp
 sinxy_heights.cpp
+terrain_camera.cpp
+terrain_camera.hpp
+terrain_grid.cpp
+terrain_grid.hpp
 terrain_mesh.cpp
 terrain_scale.cpp
 terrain_scale_ui.cpp

@@ -1,7 +1,7 @@
 #version 320 es
 
 /* Geometry shader program to transform triangles to a line in a `d` direction with a
-specified `d_length` length. The program can fe used to visualize triangle normal or a
+specified `d_length` length. The program can be used to visualize triangle normal or a
 light direction. */
 
 layout(triangles) in;

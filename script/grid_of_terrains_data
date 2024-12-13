@@ -1,0 +1,38 @@
+#!/bin/bash
+# Script to generate data for `height_overlap` sample
+
+# exit after firts error
+set -e
+
+TARGET_PATH="../data/gen/grid_of_terrains"
+GRID_SIZE=4
+
+# if conda available activate earthren environment
+if command -v conda >/dev/null 2>&1; then
+	# Source the Conda initialization script
+	source "$(conda info --base)/etc/profile.d/conda.sh"
+	conda activate earthren
+	echo "earthren environment activated"
+fi
+
+echo "--> generate elevation tiles"
+python3 split_tile_overlap.py --row-tiles 4 ../data/plzen_elev.tif
+
+echo "--> generate satellite tiles"
+python3 split_tile.py --row-tiles 4 ../data/plzen_rgb.tif
+
+# remove tile 2_2 to test we can render in case some tiles are missing
+rm ./out/plzen_*_2_2.tif
+
+echo "--> install"
+mkdir -p $TARGET_PATH
+mv ./out/plzen_*.tif $TARGET_PATH
+echo "installed to $TARGET_PATH"
+
+echo "--> dataset description"
+python3 create_dataset_desc.py $TARGET_PATH $GRID_SIZE
+
+echo "--> clean"
+rm -r ./out
+
+echo "done!"

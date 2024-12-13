@@ -4,7 +4,7 @@
 
 precision mediump float;
 precision mediump sampler2D;
-precision mediump usampler2D;  // TODO: there is also `highp` (32bit flaot) precision there
+precision mediump usampler2D;  // TODO: there is also `highp` (32bit float) precision there
 
 uniform usampler2D heights;  // 16bit INT height texture
 uniform sampler2D satellite_map;  // 8bit UINT texture
