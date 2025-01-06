@@ -6,7 +6,7 @@
 #include <spdlog/spdlog.h>
 #include "geometry/glmprint.hpp"
 #include "texture.hpp"
-#include "terrain_grid.hpp"
+#include "more_details_terrain_grid.hpp"
 
 // to implement is_above()
 #include <boost/geometry/algorithms/intersects.hpp>
@@ -16,17 +16,18 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
-using std::map;
+using std::map, std::vector;
 using std::string, std::to_string;
 using std::filesystem::path;
 using std::pair;
+using std::unique_ptr, std::make_unique;
 using std::tuple, std::get;
 using glm::vec2, glm::vec3;
 
 namespace {  //!< Helper functions.
 
 //! Helper function to calculate word position from grid (coumn, row) position.
-vec2 to_word_position(int column, int row, int grid_size, float quad_size);
+vec2 to_word_position(int column, int row, int level, float quad_size);
 
 bool is_square(tuple<GLuint, size_t, size_t> const & tile) {
 	return get<1>(tile) == get<2>(tile);
@@ -54,8 +55,8 @@ bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 cons
 
 float terrain_grid::camera_ground_height = 0.0f;
 
-void terrain_grid::load_tiles(path const & data_path) {
 
+vector<terrain> terrain_grid::load_level_tiles(path const & data_path, int level) const {
 	// TODO: the implementation produce unordered list of terrains (which can be a performance issue during the rendering because you want to access adjacent terrains).
 	using std::filesystem::directory_iterator;
 	using std::regex, std::smatch, std::regex_match;
@@ -63,10 +64,10 @@ void terrain_grid::load_tiles(path const & data_path) {
 	path const tile_directory = data_path;
 	if (!exists(tile_directory)) {
 		spdlog::error("tile directory '{}' does not exists", tile_directory.c_str());
-		return;
+		return {};
 	}
 
-	load_description(data_path);  // read dataset description file first
+	vector<terrain> terrains;
 
 	// - make a list of tiles froom tiles_directory
 	// - we expect `.+_elev_C_R.tif` and `.+_rgb_C_R.tif` tile files there
@@ -97,12 +98,16 @@ void terrain_grid::load_tiles(path const & data_path) {
 			// - calculate terrain word position
 			int const column = stoi(column_str),
 				row = stoi(row_str);
-			vec2 const word_pos = to_word_position(column, row, _grid_size, quad_size);
+
+			// TODO: there we need level to proper calculate grid position
+			float const level_quad_size = (2.0f*quad_size) / pow(2, level-1);  // TODO: equation works for level 2 and 3, later we neeed to agree on a leveling
+			vec2 const word_pos = to_word_position(column, row, level, level_quad_size);
 
 			// - load elevation tile
 			auto const elevation_tile = create_texture_16b(file);
 			assert(is_square(elevation_tile) && "we expect square elevation tiles");
-			assert(size_t(_elevation_tile_size) == get<1>(elevation_tile) && "unexpected elevation tile size");
+			// TODO: we do noot have level information to check elevation tile size
+			// assert(size_t(_elevation_tile_size) == get<1>(elevation_tile) && "unexpected elevation tile size");
 
 			// - load satellite tile
 			auto const satellite_tile = create_texture_8b(satellite_path);
@@ -120,13 +125,60 @@ void terrain_grid::load_tiles(path const & data_path) {
 			// - calculate elevation max value
 			trn.elevation_min = _elevation_tile_max_value.at(file.filename());  // TODO: can thrrow std::out_of_range
 
-			// - add to the list of terrains
-			_terrains.push_back(trn);
+			// - add to the terrain quad tree
+			terrains.push_back(trn);
 		}
+	}
+
+	return terrains;
+}
+
+size_t terrain_grid::size() const {
+	return _terrain_count;
+}
+
+void terrain_grid::load_tiles(path const & data_path) {
+	// load terrains, for now let's assume level 2 and 3 only
+	auto const data_l2_path = data_path/"level2";
+
+	load_description(data_l2_path, 2);  // read dataset description file for level 2 tiles
+
+	vector<terrain> terrains_l2 = load_level_tiles(data_l2_path, 2);
+
+	// construct level 2 quad tree
+	assert(std::size(terrains_l2) == 4 && "this sample expect 4 level 2 quadtree tiles");
+	for (terrain & trn : terrains_l2) {
+		int const idx = trn.grid_c + trn.grid_r * 2;
+		assert(idx <= 4 && "four terrains are expected, not more");
+		trn.level = 2;
+		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
+		quad->data = trn;
+		_root.children[idx] = std::move(quad);
+	}
+	_terrain_count += std::size(terrains_l2);
+	// TODO: cheeck all children are assigned (we need to do that, becaause grid_c or grid_r can goes wrong
+
+	// TODO: before we can load next level we somehow need to deal with description data from previous level stored as _elevation_tile_size, _satellite_tile_size, ...
+	_elevation_tile_max_value.clear();  // TODO: here we do not realy want to free resources there (this is sloow, we only want to set map size to 0)
+
+	auto const data_l3_path = data_path/"level3";
+	load_description(data_l3_path, 3);
+
+	// construct level 3 quad tree
+	vector<terrain> terrains_l3 = load_level_tiles(data_l3_path, 3);
+	assert(std::size(terrains_l3) == 4 && "this saample expect 4 level 3 quadtree tiles");
+	auto & root = _root.children[0];
+	for (terrain & trn : terrains_l3) {
+		int const idx = trn.grid_c + trn.grid_r * 2;
+		assert(idx <= 4 && "four terrains are expected, not more");
+		trn.level = 3;
+		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
+		quad->data = trn;
+		root->children[idx] = std::move(quad);
 	}
 }
 
-void terrain_grid::load_description(path const & data_path) {
+void terrain_grid::load_description(path const & data_path, int level) {
 	boost::property_tree::ptree config;  // TODO: rename to dataset
 	boost::property_tree::read_json(data_path/"dataset.json", config);
 
@@ -134,22 +186,32 @@ void terrain_grid::load_description(path const & data_path) {
 	terminate called after throwing an instance of 'boost::wrapexcept<boost::property_tree::ptree_bad_path>'
 		what():  No such node (elevation.tile_prefix) */
 
-	_grid_size = config.get<int>("grid_size");
 	_elevation_tile_prefix = config.get<string>("elevation.tile_prefix");
-	_elevation_pixel_size = config.get<double>("elevation.pixel_size");
-	_elevation_tile_size = config.get<int>("elevation.tile_size");
 	_satellite_tile_prefix = config.get<string>("satellite.tile_prefix");
-	_satellite_tile_size = config.get<int>("satellite.tile_size");
+
+	dataset_description desc;
+	desc.elevation_tile_size = config.get<int>("elevation.tile_size");
+	desc.satellite_tile_size = config.get<int>("satellite.tile_size");
+	desc.elevation_pixel_size = config.get<double>("elevation.pixel_size");
+	_data_desc[level] = desc;
 
 	// create list of elevation max values
 	for (auto const & kv : config.get_child("files"))  // TODO: this is work for transsform
 		_elevation_tile_max_value.insert(pair{path{kv.first}, kv.second.get<int>("maxval")});  // TODO: emplace?
 }
 
+terrain_grid::~terrain_grid() {
+	for (terrain const & trn : leaf_view{_root}) {  // TODO: terrain is now owner of textures so it is terrain responsibility to delete textures
+		glDeleteTextures(1, &trn.elevation_map);
+		glDeleteTextures(1, &trn.satellite_map);
+	}
+}
+
 
 namespace {
 
-vec2 to_word_position(int column, int row, int grid_size, float quad_size) {
+vec2 to_word_position(int column, int row, int level, float quad_size) {
+	int const grid_size = pow(2, level-1);
 	vec2 const position = vec2{column, -row} * quad_size - vec2{grid_size, -(grid_size-(2*1))} * quad_size*0.5f;
 	return position;
 }

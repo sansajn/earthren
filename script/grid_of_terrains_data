@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to generate data for `height_overlap` sample
+# Script to generate data for `grid_of_terrains` sample
 
 # exit after firts error
 set -e

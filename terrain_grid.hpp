@@ -5,7 +5,7 @@
 #include <glm/vec2.hpp>
 #include <GLES3/gl32.h>
 
-/* - we are expecting that all terrains has the same size textures so no reason to store texture w/h
+/* - we are expecting that all terrains has the same size textures so thre is no reason to store texture w/h
 - grid_size is also the same for all terrain */
 struct terrain {
 	GLuint elevation_map,

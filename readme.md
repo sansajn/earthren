@@ -54,6 +54,66 @@ E.g. to prepare Plzen area data (used by `terrain_mesh`, `height_overlap` or `fo
 
 # Samples
 
+## `more_details`
+The sample starts with Level Of Detail (LOD) implementation for terrains. In this first step we are gonna to introduce more detailed level of a data for one terrain. The sample renders four terrains where the first terrain is rendered as four other terrains (with higher LOD). 
+
+![](docasset/more_details.png)
+
+Sample is based on previous [[#`grid_of_terrains`]] sample. 
+
+In the previous samples we have uses an unordered array of terrains each with a position in a terrain grid. To support LOD we want to put terrains into quad tree structure. In next samples we can then split tree leaves based on camera distance this way: if the leave became close enough we split it into quads and increase level of detail this way.
+
+To generate sample data
+- go to `script` directory
+- run `prepare_plzen` to generate Plzen area tiles and then
+- run `more_terrains_data` to generate sample tiles into `data/gen/more_terrains`
+
+What is new:
+- can draw a terrain in a more detail
+
+
+## `grid_of_terrains`
+The sample implements terrain-grid structure allows to render grid of non adjacent tiles (in all before samples we could only render adjacent terrains). Sample is based on previous [[#`above_terrain`]] sample.
+
+![](docasset/grid_of_terrains.png)
+
+To generate sample data
+- go to `script` directory
+- run `prepare_plzen` to generate Plzen area tiles and then
+- run `grid_of_terrains_data` to generate sample tiles into `data/gen/grid_of_terrains`
+
+What is new:
+- `terrain_grid` introduced
+- `terrain_camera` introduced
+- config file `dataset.json` with a data directory description
+
+## `above_terrain`
+This sample implements camera which always stays above terrain. Visually the ouput looks the same as in [[#`terrain_scale`]] sample.
+
+![](docasset/terrain_mesh.jpg)
+
+The problem with previous camera implementation (e.g. [[#`terrain_scale`]] and older samples) is that it rotates around $(0,0,0)$ point and not around point on terrain ground. Rotations close to ground therefore not really works and ends up bellow terrain. Therefore we want from camera to stay over the terrain level.
+
+This sample use the same data as [[#`height_overlap`]] sample so to generate data
+- go to `script` directory
+- run `prepare_plzen` to generate Plzen area tiles and then
+- run `height_overlap_data` to generate sample tiles into `data/gen/four_terrain`
+
+What is new:
+- Boost.Geometry integration thanks to my old [geometry](https://github.com/sansajn/geometry/tree/master/geometry) library
+- camera stays always above terrain ground level
+
+## `terrain_scale`
+In order to think about tree of a quad we wan to be able to experiment with terrain scale and resolution (quad resolution).
+
+Sample adds *Quad Scale* and *Quad (NxN) resolution* options
+![](docasset/terrain_scale.png.png)
+
+This sample use the same data as [[#`height_overlap`]] sample so to generate data
+- go to `script` directory
+- run `prepare_plzen` to generate Plzen area tiles and then
+- run `height_overlap_data` to generate sample tiles into `data/gen/four_terrain`
+
 ## `terrain_mesh`
 Renders 4 terrains next to each other without tile edges issue (elevation and satellite) as in a previous `four_terrain` sample.
 

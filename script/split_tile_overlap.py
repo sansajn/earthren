@@ -1,5 +1,14 @@
-# Script creates four tiles from input tile with 1px overlapping to get rid of artifacts during terrain rendering. Tiles are split from top left corner and saved as tile_{C}_{R}.jpg, where C represents column and R row of a 2x2 grid. This means tile_0_0.tif shows top-left quadrant tile_1_0.tif top-right quadrant, .... Works with GDAL 3.4.3 or 3.8.4.
-# usage: split_quarter_overlap.py [-h] --row-tiles ROW_TILES [input_tile]
+"""
+Script creates ROW_TILESxROW_TILES tiles from input tile with 1px overlapping 
+to get rid of artifacts during terrain rendering. Tiles are split from top left 
+corner and saved as tile_{C}_{R}.jpg, where C represents column and R row of 
+a 2x2 grid. Tiles are stored into `./out` directory.
+
+This means tile_0_0.tif shows top-left quadrant tile_1_0.tif top-right quadrant, 
+.... Works with GDAL 3.4.3 or 3.8.4.
+
+Usage: split_tile_overlap.py [-h] --row-tiles ROW_TILES [input_tile]
+"""
 from osgeo import gdal
 import math
 import os
@@ -26,7 +35,7 @@ def main():
 	# Set the target UTM projection (replace EPSG:32633 with your UTM zone)
 	utm_proj = 'EPSG:32633'  # Example UTM zone, adjust accordingly
 
-	os.makedirs('./out', exist_ok=True)  # ensure output directory
+	os.makedirs(output_directory, exist_ok=True)  # ensure output directory
 
 	# Use GDAL's warp function to reproject the tile
 	dst_ds = gdal.Warp(f'{output_directory}/reprojected_tile.tif', src_ds, dstSRS=utm_proj)
