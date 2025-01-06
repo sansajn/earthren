@@ -120,6 +120,9 @@ def build():
 
 	env.Program(['more_details.cpp', 'more_details_terrain_grid.cpp', more_details_common, imgui])
 
+	# lod tiles
+	env.Program(['lod_tiles.cpp', 'more_details_terrain_grid.cpp', more_details_common, imgui])
+
 	# other samples ...
 
 def configure(env, dependency_list):

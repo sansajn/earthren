@@ -224,6 +224,7 @@ imgui/misc/natvis/imgui.natvis
 imgui/misc/single_file/imgui_single_file.h
 io.cpp
 io.hpp
+lod_tiles.cpp
 map_camera.cpp
 more_details.cpp
 more_details_terrain_grid.cpp
