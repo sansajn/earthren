@@ -225,6 +225,8 @@ imgui/misc/single_file/imgui_single_file.h
 io.cpp
 io.hpp
 lod_tiles.cpp
+lod_tiles_draw_terrain.cpp
+lod_tiles_draw_terrain.hpp
 lod_tiles_user_input.cpp
 lod_tiles_user_input.hpp
 map_camera.cpp
