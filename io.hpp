@@ -1,4 +1,9 @@
-/*! input/output helpers */
+/*! \file
+Input/output helpers. */
+
+/* TODO: we introduced input.hpp for input handling functions (mouse keyboard), but that
+is kind of collidate with io.hpp. Find a bethed harbor for `read_file` function. */
+
 #pragma once
 #include <string>
 #include <filesystem>
