@@ -1,0 +1,84 @@
+#!/bin/bash
+# Script to generate data for `grid_more_details` sample.
+
+# exit after first error
+set -e
+
+# - we need to split plzen tile to 4 tiles (2x2) to generte level 2 tiles
+# - we need to split level 2 (0.0) tile into another 4 tiles to generte level 3 tiles
+TARGET_PATH="../data/gen/more_details"
+GRID_SIZE=2
+
+# if conda available activate earthren environment
+if command -v conda >/dev/null 2>&1; then
+	# Source the Conda initialization script
+	source "$(conda info --base)/etc/profile.d/conda.sh"
+	conda activate earthren
+	echo "earthren environment activated"
+fi
+
+rm -rf out
+
+echo "--> generate elevation tiles"
+
+# generate level 2 tiles
+python3 split_tile_overlap.py --row-tiles $GRID_SIZE ../data/plzen_elev.tif
+
+# take level 2 elevation tiles and save tham for later use
+cd out
+mkdir level2
+mv plzen_elev_*.tif level2
+cd ..
+
+cp out/level2/plzen_elev_0_0.tif out/plzen_elev.tif
+
+# generate level 3 tiles
+python3 split_tile_overlap.py --row-tiles $GRID_SIZE out/plzen_elev.tif
+
+# take level 3 elevation tiles and save tham for later use
+cd out
+mkdir level3
+mv plzen_elev_*.tif level3
+cd ..
+
+
+echo "--> generate satellite tiles"
+
+# generate level 2 satellite tiles
+python3 split_tile.py --row-tiles $GRID_SIZE ../data/plzen_rgb.tif
+
+# take level 2 satelite tiles and save tham into level2 directory
+cd out
+mv plzen_rgb_*.tif level2
+cd ..
+
+cp out/level2/plzen_rgb_0_0.tif out/plzen_rgb.tif
+
+# generate level 3 satellite tiles
+python3 split_tile.py --row-tiles $GRID_SIZE out/plzen_rgb.tif
+
+# take level 3 elevation tiles and save tham for later use
+cd out
+mv plzen_rgb_*.tif level3
+cd ..
+
+
+echo "--> install"
+mkdir -p $TARGET_PATH
+mv ./out/level* $TARGET_PATH
+echo "installed to $TARGET_PATH"
+
+
+echo "--> dataset description"
+python3 create_dataset_desc.py $TARGET_PATH/level2 $GRID_SIZE
+python3 create_dataset_desc.py $TARGET_PATH/level3 $GRID_SIZE
+
+
+echo "--> clean"
+rm -r ./out
+
+echo "check result with"
+echo "  ls $TARGET_PATH"
+echo "command"
+
+echo "done!"

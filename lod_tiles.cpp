@@ -384,7 +384,6 @@ bool input(Camera & cam, input_mode & mode, render_features & features,
 		if (imgui_mouse_captured || imgui_keyboard_captured)
 			continue; // If ImGui wants to capture the event, skip further processing
 
-
 		input_control_mode(event, mode, events);
 		input_camera(event, cam, mode, events);
 		input_render_features(event, features);
