@@ -20,26 +20,27 @@ if command -v conda >/dev/null 2>&1; then
 fi
 
 rm -rf out
+
 mkdir out
+mkdir out/level0
+mkdir out/level1
+mkdir out/level2
 
 echo "--> generate elevation tiles"
 
 # generate level 0 tile
 echo "- level 0"
-mkdir out/level0
-cp ../data/plzen_elev.tif out/level0
+cp ../data/plzen_elev.tif out/level0/plzen_elev_0_0.tif
 
 # generate level 1 tiles
 echo "- level 1"
 python3 split_tile_overlap.py --row-tiles 2 ../data/plzen_elev.tif
 
 # take level 1 elevation tiles and save them for later deployment
-mkdir out/level1
 mv out/plzen_elev_*.tif out/level1
 
 # generate level 2 tiles
 echo "- level 2"
-mkdir out/level2
 
 for tile in out/level1/plzen_elev_*.tif; do
 	# split tile
@@ -54,43 +55,53 @@ for tile in out/level1/plzen_elev_*.tif; do
 	mv out/plzen_elev_*.tif out/level2
 done
 
-# echo "--> generate satellite tiles"
 
-# # generate level 2 satellite tiles
-# python3 split_tile.py --row-tiles $GRID_SIZE ../data/plzen_rgb.tif
+echo "--> generate satellite tiles"
 
-# # take level 2 satelite tiles and save tham into level2 directory
-# cd out
-# mv plzen_rgb_*.tif level2
-# cd ..
+# generate level 0 tile
+echo "- level 0"
+cp ../data/plzen_rgb.tif out/level0/plzen_rgb_0_0.tif
 
-# cp out/level2/plzen_rgb_0_0.tif out/plzen_rgb.tif
+# generate level 1 tiles
+echo "- level 1"
+python3 split_tile.py --row-tiles 2 ../data/plzen_rgb.tif
 
-# # generate level 3 satellite tiles
-# python3 split_tile.py --row-tiles $GRID_SIZE out/plzen_rgb.tif
+# take level 1 elevation tiles and save them for later deployment
+mv out/plzen_rgb_*.tif out/level1
 
-# # take level 3 elevation tiles and save tham for later use
-# cd out
-# mv plzen_rgb_*.tif level3
-# cd ..
+# generate level 2 tiles
+echo "- level 2"
+
+for tile in out/level1/plzen_rgb_*.tif; do
+	# split tile
+	python3 split_tile.py --row-tiles 2 "$tile"
+	
+	# there we need to modify file names before move tiles
+	for new_tile in out/plzen_rgb_*.tif; do
+		python3 rename_tile.py "$new_tile"
+	done
+
+	# move tiles to level2 folder
+	mv out/plzen_rgb_*.tif out/level2
+done
+
+echo "--> install tiles"
+mkdir -p $TARGET_PATH
+mv ./out/level* $TARGET_PATH
+echo "tile installed to $TARGET_PATH"
 
 
-# echo "--> install"
-# mkdir -p $TARGET_PATH
-# mv ./out/level* $TARGET_PATH
-# echo "installed to $TARGET_PATH"
+echo "--> dataset description"
+python3 create_dataset_desc.py $TARGET_PATH/level0 1
+python3 create_dataset_desc.py $TARGET_PATH/level1 2
+python3 create_dataset_desc.py $TARGET_PATH/level2 4
 
 
-# echo "--> dataset description"
-# python3 create_dataset_desc.py $TARGET_PATH/level2 $GRID_SIZE
-# python3 create_dataset_desc.py $TARGET_PATH/level3 $GRID_SIZE
+echo "--> clean"
+#rm -r ./out
 
-
-# echo "--> clean"
-# rm -r ./out
-
-# echo "check result with"
-# echo "  ls $TARGET_PATH"
-# echo "command"
+echo "check result with"
+echo "  ls $TARGET_PATH"
+echo "command"
 
 echo "done!"

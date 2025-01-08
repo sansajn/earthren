@@ -5,6 +5,8 @@ def main(args):
 	dataset_path = args[1]
 	grid_size = int(args[2])
 
+	# TODO: elevation, satellite tile_prefix hardcoded in a config, fix that
+
 	# Initial dataset configuration file structure
 	config = {
 		"// Describes dataset directory": "",
