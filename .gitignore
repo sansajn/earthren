@@ -10,6 +10,8 @@ learn/tiles/
 learn/tiles_utm/
 learn/out
 
+script/out
+
 xy_plane
 xy_plane_grid
 xy_plane_panzoom

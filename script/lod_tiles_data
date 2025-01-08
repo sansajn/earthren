@@ -4,10 +4,12 @@
 # exit after first error
 set -e
 
-# - we need to split plzen tile to 4 tiles (2x2) to generte level 2 tiles
-# - we need to split level 2 (0.0) tile into another 4 tiles to generte level 3 tiles
-TARGET_PATH="../data/gen/more_details"
-GRID_SIZE=2
+# - we want plzen tile to represent level 0 tile
+# - then we want to split level 0 tile into 4 tiles to generate level 1 tiles
+# - then we want to split each level 1 tile into 4 tiles to generate level 2 tiles (16 tiles)
+# - (optional) we want to scale level 0 tile to 25% (we do not need that much details there)
+# - (optional) we want to scale level 1 tils to 50% (we want only level 2 be in a full detail)
+TARGET_PATH="../data/gen/lod_tiles"
 
 # if conda available activate earthren environment
 if command -v conda >/dev/null 2>&1; then
@@ -18,67 +20,77 @@ if command -v conda >/dev/null 2>&1; then
 fi
 
 rm -rf out
+mkdir out
 
 echo "--> generate elevation tiles"
 
+# generate level 0 tile
+echo "- level 0"
+mkdir out/level0
+cp ../data/plzen_elev.tif out/level0
+
+# generate level 1 tiles
+echo "- level 1"
+python3 split_tile_overlap.py --row-tiles 2 ../data/plzen_elev.tif
+
+# take level 1 elevation tiles and save them for later deployment
+mkdir out/level1
+mv out/plzen_elev_*.tif out/level1
+
 # generate level 2 tiles
-python3 split_tile_overlap.py --row-tiles $GRID_SIZE ../data/plzen_elev.tif
+echo "- level 2"
+mkdir out/level2
 
-# take level 2 elevation tiles and save tham for later use
-cd out
-mkdir level2
-mv plzen_elev_*.tif level2
-cd ..
+for tile in out/level1/plzen_elev_*.tif; do
+	# split tile
+	python3 split_tile_overlap.py --row-tiles 2 "$tile"
+	
+	# there we need to modify file names before move tiles
+	for new_tile in out/plzen_elev_*.tif; do
+		python3 rename_tile.py "$new_tile"
+	done
 
-cp out/level2/plzen_elev_0_0.tif out/plzen_elev.tif
+	# move tiles to level2 folder
+	mv out/plzen_elev_*.tif out/level2
+done
 
-# generate level 3 tiles
-python3 split_tile_overlap.py --row-tiles $GRID_SIZE out/plzen_elev.tif
+# echo "--> generate satellite tiles"
 
-# take level 3 elevation tiles and save tham for later use
-cd out
-mkdir level3
-mv plzen_elev_*.tif level3
-cd ..
+# # generate level 2 satellite tiles
+# python3 split_tile.py --row-tiles $GRID_SIZE ../data/plzen_rgb.tif
 
+# # take level 2 satelite tiles and save tham into level2 directory
+# cd out
+# mv plzen_rgb_*.tif level2
+# cd ..
 
-echo "--> generate satellite tiles"
+# cp out/level2/plzen_rgb_0_0.tif out/plzen_rgb.tif
 
-# generate level 2 satellite tiles
-python3 split_tile.py --row-tiles $GRID_SIZE ../data/plzen_rgb.tif
+# # generate level 3 satellite tiles
+# python3 split_tile.py --row-tiles $GRID_SIZE out/plzen_rgb.tif
 
-# take level 2 satelite tiles and save tham into level2 directory
-cd out
-mv plzen_rgb_*.tif level2
-cd ..
-
-cp out/level2/plzen_rgb_0_0.tif out/plzen_rgb.tif
-
-# generate level 3 satellite tiles
-python3 split_tile.py --row-tiles $GRID_SIZE out/plzen_rgb.tif
-
-# take level 3 elevation tiles and save tham for later use
-cd out
-mv plzen_rgb_*.tif level3
-cd ..
+# # take level 3 elevation tiles and save tham for later use
+# cd out
+# mv plzen_rgb_*.tif level3
+# cd ..
 
 
-echo "--> install"
-mkdir -p $TARGET_PATH
-mv ./out/level* $TARGET_PATH
-echo "installed to $TARGET_PATH"
+# echo "--> install"
+# mkdir -p $TARGET_PATH
+# mv ./out/level* $TARGET_PATH
+# echo "installed to $TARGET_PATH"
 
 
-echo "--> dataset description"
-python3 create_dataset_desc.py $TARGET_PATH/level2 $GRID_SIZE
-python3 create_dataset_desc.py $TARGET_PATH/level3 $GRID_SIZE
+# echo "--> dataset description"
+# python3 create_dataset_desc.py $TARGET_PATH/level2 $GRID_SIZE
+# python3 create_dataset_desc.py $TARGET_PATH/level3 $GRID_SIZE
 
 
-echo "--> clean"
-rm -r ./out
+# echo "--> clean"
+# rm -r ./out
 
-echo "check result with"
-echo "  ls $TARGET_PATH"
-echo "command"
+# echo "check result with"
+# echo "  ls $TARGET_PATH"
+# echo "command"
 
 echo "done!"
