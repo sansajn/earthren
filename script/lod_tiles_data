@@ -7,8 +7,6 @@ set -e
 # - we want plzen tile to represent level 0 tile
 # - then we want to split level 0 tile into 4 tiles to generate level 1 tiles
 # - then we want to split each level 1 tile into 4 tiles to generate level 2 tiles (16 tiles)
-# - (optional) we want to scale level 0 tile to 25% (we do not need that much details there)
-# - (optional) we want to scale level 1 tils to 50% (we want only level 2 be in a full detail)
 TARGET_PATH="../data/gen/lod_tiles"
 
 # if conda available activate earthren environment
@@ -85,6 +83,24 @@ for tile in out/level1/plzen_rgb_*.tif; do
 	mv out/plzen_rgb_*.tif out/level2
 done
 
+
+echo "--> scale lower LOD tiles"
+
+echo "- level 0"
+for tile in out/level0/*.tif; do
+	gdal_translate -outsize 25% 25% $tile out/scaled.tif
+	rm $tile
+	mv out/scaled.tif $tile
+done
+
+echo "- level 1"
+for tile in out/level1/*.tif; do
+	gdal_translate -outsize 50% 50% $tile out/scaled.tif
+	rm $tile
+	mv out/scaled.tif $tile
+done
+
+
 echo "--> install tiles"
 mkdir -p $TARGET_PATH
 mv ./out/level* $TARGET_PATH
@@ -98,7 +114,7 @@ python3 create_dataset_desc.py $TARGET_PATH/level2 4
 
 
 echo "--> clean"
-#rm -r ./out
+rm -r ./out
 
 echo "check result with"
 echo "  ls $TARGET_PATH"
