@@ -87,7 +87,7 @@ path const LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_FRAGMENT_SHADER_FILE = "colored.fs";
 
 path const config_file_path = "lod_tiles.ini",
-	data_path = "data/gen/more_details";
+	data_path = "data/gen/lod_tiles";
 
 void verbose_signal_handler(int signal);
 

@@ -121,7 +121,7 @@ def build():
 	env.Program(['more_details.cpp', 'more_details_terrain_grid.cpp', more_details_common, imgui])
 
 	# lod tiles
-	env.Program(['lod_tiles.cpp', 'more_details_terrain_grid.cpp',
+	env.Program(['lod_tiles.cpp', 'lod_tiles_terrain_grid.cpp',
 		'lod_tiles_user_input.cpp', 'lod_tiles_draw_terrain.cpp', more_details_common, imgui])
 
 	# other samples ...

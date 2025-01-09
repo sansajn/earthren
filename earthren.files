@@ -227,6 +227,8 @@ io.hpp
 lod_tiles.cpp
 lod_tiles_draw_terrain.cpp
 lod_tiles_draw_terrain.hpp
+lod_tiles_terrain_grid.cpp
+lod_tiles_terrain_grid.hpp
 lod_tiles_user_input.cpp
 lod_tiles_user_input.hpp
 map_camera.cpp
