@@ -41,7 +41,7 @@ GLuint get_tid(tuple<GLuint, size_t, size_t> const & tile) {  //!< get OpenGL te
 
 }  // namespace
 
-bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 const & pos) {  // TODO: do we want camera instead of pos there? is_above would make more sence in that case
+bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 const & pos) {
 	namespace bg = boost::geometry;
 
 	// calculate terrain bounding box (it is axis aligned)
@@ -80,9 +80,7 @@ vector<terrain> terrain_grid::load_level_tiles(path const & data_path, int level
 		path const & file = dir_entry.path();  // full path tile filename
 
 		// - for each elevation tile
-		if (file.filename().string().starts_with(_elevation_tile_prefix)) {  // TODO: can we use range algorithm there?
-			// TODO: introduce elevation_file
-
+		if (file.filename().string().starts_with(_elevation_tile_prefix)) {
 			// - parse grid collumn (C) and row (R) position
 			regex const tile_pattern{R"(.+(\d+)_(\d+)\.tif)"};  // (column), (row)
 			smatch what;
@@ -219,8 +217,8 @@ void terrain_grid::load_description(path const & data_path, int level) {
 	boost::property_tree::ptree dataset;
 	boost::property_tree::read_json(data_path/"dataset.json", dataset);
 
-	/* TODO properties are mandatory otherwisee
-	terminate called after throwing an instance of 'boost::wrapexcept<boost::property_tree::ptree_bad_path>'
+	/* following properties are mandatory otherwise terminate called after
+	throwing an instance of 'boost::wrapexcept<boost::property_tree::ptree_bad_path>'
 		what():  No such node (elevation.tile_prefix) */
 
 	_elevation_tile_prefix = dataset.get<string>("elevation.tile_prefix");
@@ -233,8 +231,8 @@ void terrain_grid::load_description(path const & data_path, int level) {
 	_data_desc[level] = desc;
 
 	// create list of elevation max values
-	for (auto const & kv : dataset.get_child("files"))  // TODO: this is work for transform function
-		_elevation_tile_max_value.insert(pair{path{kv.first}, kv.second.get<int>("maxval")});  // TODO: emplace?
+	for (auto const & kv : dataset.get_child("files"))
+		_elevation_tile_max_value.emplace(path{kv.first}, kv.second.get<int>("maxval"));
 }
 
 size_t terrain_grid::size() const {
