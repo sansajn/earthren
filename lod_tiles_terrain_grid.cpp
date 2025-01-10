@@ -113,13 +113,12 @@ vector<terrain> terrain_grid::load_level_tiles(path const & data_path, int level
 			// - load elevation tile
 			auto const elevation_tile = create_texture_16b(file);
 			assert(is_square(elevation_tile) && "we expect square elevation tiles");
-			// TODO: we do noot have level information to check elevation tile size
-			// assert(size_t(_elevation_tile_size) == get<1>(elevation_tile) && "unexpected elevation tile size");
+			assert(size_t(elevation_tile_size(level)) == get<1>(elevation_tile) && "unexpected elevation tile size");
 
 			// - load satellite tile
 			auto const satellite_tile = create_texture_8b(satellite_path);
 			assert(is_square(satellite_tile));
-			// TODO: check satellite tile size
+			assert(size_t(satellite_tile_size(level)) == get<1>(satellite_tile) && "unexpected satellite tile size");
 
 			// - create terrain instance and filll maps and position
 			terrain trn;
