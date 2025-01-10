@@ -173,27 +173,16 @@ void terrain_grid::load_tiles(path const & data_path) {
 	// TODO: before we can load next level we somehow need to deal with description data from previous level stored as _elevation_tile_size, _satellite_tile_size, ...
 	_elevation_tile_max_value.clear();  // TODO: here we do not realy want to free resources there (this is sloow, we only want to set map size to 0)
 
-	auto const data_l3_path = data_path/"level2";
-	load_description(data_l3_path, 3);
+	auto const data_l2_path = data_path/"level2";
+	load_description(data_l2_path, 3);
 
-	// construct level 3 quad tree
-	vector<terrain> terrains_l3 = load_level_tiles(data_l3_path, 3);
-	// assert(std::size(terrains_l3) == 4 && "this sample expect 4 level 3 quadtree tiles");
+	// construct level 2 quad tree
+	vector<terrain> terrains_l2 = load_level_tiles(data_l2_path, 3);
 	auto & root = _root.children[0];
-	// for (terrain & trn : terrains_l3) {
-	// 	int const idx = trn.grid_c + trn.grid_r * 2;
-	// 	assert(idx <= 4 && "four terrains are expected, not more");
-	// 	trn.level = 3;
-	// 	unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
-	// 	quad->data = trn;
-	// 	root->children[idx] = std::move(quad);
-	// }
-	// we need to assign `plzen_elev_0_0.tif`, `plzen_elev_0_1.tif`, `plzen_elev_0_2.tif`, `plzen_elev_0_3.tif`
-
 
 	{
-		auto trn_it = std::ranges::find_if(terrains_l3, terrain_finder{0, 0});
-		assert(trn_it != end(terrains_l3) && "terrain (0,0) is missing");
+		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{0, 0});
+		assert(trn_it != end(terrains_l2) && "terrain (0,0) is missing");
 		trn_it->level = 3;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
@@ -201,8 +190,8 @@ void terrain_grid::load_tiles(path const & data_path) {
 	}
 
 	{
-		auto trn_it = std::ranges::find_if(terrains_l3, terrain_finder{1, 0});
-		assert(trn_it != end(terrains_l3) && "terrain (1,0) is missing");
+		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{1, 0});
+		assert(trn_it != end(terrains_l2) && "terrain (1,0) is missing");
 		trn_it->level = 3;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
@@ -210,8 +199,8 @@ void terrain_grid::load_tiles(path const & data_path) {
 	}
 
 	{
-		auto trn_it = std::ranges::find_if(terrains_l3, terrain_finder{0, 1});
-		assert(trn_it != end(terrains_l3) && "terrain (0,1) is missing");
+		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{0, 1});
+		assert(trn_it != end(terrains_l2) && "terrain (0,1) is missing");
 		trn_it->level = 3;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
@@ -219,8 +208,8 @@ void terrain_grid::load_tiles(path const & data_path) {
 	}
 
 	{
-		auto trn_it = std::ranges::find_if(terrains_l3, terrain_finder{1, 1});
-		assert(trn_it != end(terrains_l3) && "terrain (1,1) is missing");
+		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{1, 1});
+		assert(trn_it != end(terrains_l2) && "terrain (1,1) is missing");
 		trn_it->level = 3;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
