@@ -62,7 +62,11 @@ def build():
 	env.Program(['satellite_map.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp', 'tiff.cpp'])
 
 	# height_scale	sample
-	imgui = env.StaticLibrary([
+	imgui_env = env.Clone(
+		CCFLAGS=['-Wno-deprecated-enum-enum-conversion']  # disable warnings within the library
+	)
+
+	imgui = imgui_env.StaticLibrary([
 		Glob('imgui/*.cpp'),
 		'imgui/examples/imgui_impl_sdl.cpp',  # TODO: maybe we do not need this backend for SDL
 		'imgui/examples/imgui_impl_opengl3.cpp',  # backend for opengl es3
