@@ -14,9 +14,9 @@ struct terrain {
 	GLuint elevation_map,
 		satellite_map;
 	glm::vec2 position;  //!< Terrain word position (within thee grid).
-	float elevation_min;  // TODO: use terrain related value there, TODO: rename to eelevation_max
+	float elevation_min;
 
-	int grid_c, grid_r;  // TODO: grid position for debug
+	int grid_c, grid_r;  //!< Grid position.
 	int level = -1;  //!< Terrain level of detail (it is actually quadtree level/depth).
 };
 
@@ -29,10 +29,8 @@ struct terrain_quad {
 
 	std::array<std::unique_ptr<terrain_quad>, 4> children;
 	bool is_leaf() const {return children[0] == nullptr;}
-	value_type data;  // TODO: _data is hard to understand what we are working with, find a bether name
+	value_type trn;
 };
-
-// TODO: we need a projection for terrain_quad -> terrain for leaf_view
 
 //! Quadtree leaf traversal (depth-first search (DFS)) view implementation.
 template <typename Node>
@@ -56,11 +54,11 @@ public:
 		}
 
 		reference operator*() const {
-			return nodes.top()->data;  // Dereference the leaf node's data
+			return nodes.top()->trn;  // Dereference the leaf node's data
 		}
 
 		pointer operator->() const {
-			return &nodes.top()->data; // Access the data of the leaf node
+			return &nodes.top()->trn; // Access the data of the leaf node
 		}
 
 		iterator & operator++() {
@@ -94,15 +92,11 @@ private:
 	Node * root;
 };
 
-
-// TODO: elevation_min data are missing during load_tiles in a grid
 struct terrain_grid {
 	/* TODO: should be read_tiles member of terrain_grid? I think in the first step it is easier to
-	implement due to undestricted access and as a second step we can make it non member funnction if
+	implement due to unrestricted access and as a second step we can make it non member funnction if
 	it makes any sence. */
 
-	// TODO: check that elevation tiles are all the same (width, height), the same for satellite tiles
-	// TODO: we want to get rid og elevation_tile_prefix and satellite_tile_prefix they should be read from data_path config file
 	void load_tiles(std::filesystem::path const & data_path);
 	[[nodiscard]] size_t size() const;
 
@@ -127,7 +121,7 @@ struct terrain_grid {
 	~terrain_grid();
 
 private:
-	void load_description(std::filesystem::path const & data_path, int level);  // TODO: implementation of this needs to be changed
+	void load_description(std::filesystem::path const & data_path, int level);  // TODO: implementation of this needs to be changed, because it create a state
 	int elevation_maxval(std::filesystem::path const & filename) const;
 
 	//! \returns list of loaded terrains (meant to load quadtree level data, e.g. level 2 or 3)

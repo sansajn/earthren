@@ -154,7 +154,6 @@ struct terrain_finder {
 	int grid_c, grid_r;
 };
 
-// TODO: also change level for load_description()
 void terrain_grid::load_tiles(path const & data_path) {
 	// load terrains, for now let's assume level 1 and 2 only
 	auto const data_l1_path = data_path/"level1";
@@ -170,7 +169,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 		assert(idx <= 4 && "four terrains are expected, not more");
 		trn.level = 1;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
-		quad->data = trn;
+		quad->trn = trn;
 		_root.children[idx] = std::move(quad);
 	}
 	//_terrain_count += std::size(terrains_l1);
@@ -191,7 +190,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 		assert(trn_it != end(terrains_l2) && "terrain (0,0) is missing");
 		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
-		quad->data = *trn_it;
+		quad->trn = *trn_it;
 		root->children[0] = std::move(quad);
 	}
 
@@ -200,7 +199,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 		assert(trn_it != end(terrains_l2) && "terrain (1,0) is missing");
 		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
-		quad->data = *trn_it;
+		quad->trn = *trn_it;
 		root->children[1] = std::move(quad);
 	}
 
@@ -209,7 +208,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 		assert(trn_it != end(terrains_l2) && "terrain (0,1) is missing");
 		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
-		quad->data = *trn_it;
+		quad->trn = *trn_it;
 		root->children[2] = std::move(quad);
 	}
 
@@ -218,7 +217,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 		assert(trn_it != end(terrains_l2) && "terrain (1,1) is missing");
 		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
-		quad->data = *trn_it;
+		quad->trn = *trn_it;
 		root->children[3] = std::move(quad);
 	}
 
@@ -243,7 +242,7 @@ void terrain_grid::load_description(path const & data_path, int level) {
 	_data_desc[level] = desc;
 
 	// create list of elevation max values
-	for (auto const & kv : config.get_child("files"))  // TODO: this is work for transsform
+	for (auto const & kv : config.get_child("files"))  // TODO: this is work for transform function
 		_elevation_tile_max_value.insert(pair{path{kv.first}, kv.second.get<int>("maxval")});  // TODO: emplace?
 }
 
