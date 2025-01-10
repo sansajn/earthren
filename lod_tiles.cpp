@@ -303,7 +303,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		for (terrain const & trn : terrains.iterate()) {  // draw terrain grid
 			rendered_tile_count += 1;
 
-			float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);  // TODO: this works only for level 2 and 3
+			// level_scale is set in a way that  level 1 is not scaled (level_scale=1) that works because we are not rendering level 0 tile in the sample
+			float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);
 			vec2 const model_pos = trn.position * model_scale;
 			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale*level_scale, model_scale*level_scale, 1});  // T*S
 			mat4 const local_to_screen = P*V*M;
