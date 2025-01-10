@@ -4,6 +4,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <cmath>
 #include <spdlog/spdlog.h>
 #include "geometry/glmprint.hpp"
 #include "texture.hpp"
@@ -56,6 +57,10 @@ bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 cons
 
 float terrain_grid::camera_ground_height = 0.0f;
 
+
+int terrain_grid::grid_size(int level) const {
+	return std::pow(2, level);
+}
 
 vector<terrain> terrain_grid::load_level_tiles(path const & data_path, int level) const {
 	// TODO: the implementation produce unordered list of terrains (which can be a performance issue during the rendering because you want to access adjacent terrains).
@@ -154,37 +159,37 @@ void terrain_grid::load_tiles(path const & data_path) {
 	// load terrains, for now let's assume level 1 and 2 only
 	auto const data_l1_path = data_path/"level1";
 
-	load_description(data_l1_path, 2);  // read dataset description file for level 2 tiles
+	load_description(data_l1_path, 1);  // read dataset description file for level 2 tiles
 
-	vector<terrain> terrains_l1 = load_level_tiles(data_l1_path, 2);
+	vector<terrain> terrains_l1 = load_level_tiles(data_l1_path, 1);
 
 	// construct level 1 quad tree
 	assert(std::size(terrains_l1) == 4 && "this sample expect 4 level 2 quadtree tiles");
 	for (terrain & trn : terrains_l1) {
 		int const idx = trn.grid_c + trn.grid_r * 2;
 		assert(idx <= 4 && "four terrains are expected, not more");
-		trn.level = 2;
+		trn.level = 1;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = trn;
 		_root.children[idx] = std::move(quad);
 	}
-	_terrain_count += std::size(terrains_l1);
+	//_terrain_count += std::size(terrains_l1);
 	// TODO: cheeck all children are assigned (we need to do that, becaause grid_c or grid_r can goes wrong
 
 	// TODO: before we can load next level we somehow need to deal with description data from previous level stored as _elevation_tile_size, _satellite_tile_size, ...
 	_elevation_tile_max_value.clear();  // TODO: here we do not realy want to free resources there (this is sloow, we only want to set map size to 0)
 
 	auto const data_l2_path = data_path/"level2";
-	load_description(data_l2_path, 3);
+	load_description(data_l2_path, 2);
 
 	// construct level 2 quad tree
-	vector<terrain> terrains_l2 = load_level_tiles(data_l2_path, 3);
+	vector<terrain> terrains_l2 = load_level_tiles(data_l2_path, 2);
 	auto & root = _root.children[0];
 
 	{
 		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{0, 0});
 		assert(trn_it != end(terrains_l2) && "terrain (0,0) is missing");
-		trn_it->level = 3;
+		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
 		root->children[0] = std::move(quad);
@@ -193,7 +198,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 	{
 		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{1, 0});
 		assert(trn_it != end(terrains_l2) && "terrain (1,0) is missing");
-		trn_it->level = 3;
+		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
 		root->children[1] = std::move(quad);
@@ -202,7 +207,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 	{
 		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{0, 1});
 		assert(trn_it != end(terrains_l2) && "terrain (0,1) is missing");
-		trn_it->level = 3;
+		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
 		root->children[2] = std::move(quad);
@@ -211,11 +216,13 @@ void terrain_grid::load_tiles(path const & data_path) {
 	{
 		auto trn_it = std::ranges::find_if(terrains_l2, terrain_finder{1, 1});
 		assert(trn_it != end(terrains_l2) && "terrain (1,1) is missing");
-		trn_it->level = 3;
+		trn_it->level = 2;
 		unique_ptr<terrain_quad> quad = make_unique<terrain_quad>();
 		quad->data = *trn_it;
 		root->children[3] = std::move(quad);
 	}
+
+	_terrain_count = 7;  // leeaf  terrains
 }
 
 void terrain_grid::load_description(path const & data_path, int level) {

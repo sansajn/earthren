@@ -126,7 +126,7 @@ GLuint push_axes() {
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
-	spdlog::set_level(spdlog::level::debug);
+	// spdlog::set_level(spdlog::level::debug);
 
 	// process arguments
 	string const title = string{path{argv[0]}.stem()} + " (OpenGL ES 3.2)"s;

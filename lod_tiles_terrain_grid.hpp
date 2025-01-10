@@ -116,7 +116,7 @@ struct terrain_grid {
 		return leaf_view{_root};
 	}
 
-	[[nodiscard]] int grid_size(int level) const {return pow(2, level-1);}  // TODO: this should not be member function
+	[[nodiscard]] int grid_size(int level) const;  // TODO: this should not be member function
 	[[nodiscard]] int elevation_tile_size(int level) const {return _data_desc.at(level).elevation_tile_size;}
 	[[nodiscard]] double elevation_pixel_size(int level) const {return _data_desc.at(level).elevation_pixel_size;}
 
