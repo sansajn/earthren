@@ -122,6 +122,13 @@ GLuint push_axes() {
 	return push_data(axis_verts, sizeof(axis_verts));
 }
 
+float calc_elevation_scale(terrain_grid const & terrains, terrain const & trn, float model_scale) {
+	float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);  //= 1 (for LOD level 1)
+	int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716px
+	float const elevation_scale = (model_scale*level_scale) / (terrains.elevation_pixel_size(trn.level) * elevation_size);  //= 0.000107174
+	return elevation_scale;
+}
+
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
@@ -284,13 +291,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			for (terrain const & trn : terrains.iterate()) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
 					if (&trn != camera_terrain) {  // we want to change only when we are over new terrain
-						int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716px
-						// TODO: we have two diferrent computatios of elevation_scale and tha is not right, unite
-						float const elevation_scale = model_scale / (terrains.elevation_pixel_size(trn.level) * elevation_size);  //= 0.000107174
-
+						float const elevation_scale = calc_elevation_scale(terrains, trn, model_scale);  //= 0.000107174
 						terrain_grid::camera_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
 						camera_terrain = &trn;  // save for later comparison
-						cout << "camera-ground-height=" << terrain_grid::camera_ground_height << '\n';
+						spdlog::info("cameraground-height={}", terrain_grid::camera_ground_height);
 					}
 					break;
 				}
@@ -303,14 +307,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		for (terrain const & trn : terrains.iterate()) {  // draw terrain grid
 			rendered_tile_count += 1;
 
-			// level_scale is set in a way that  level 1 is not scaled (level_scale=1) that works because we are not rendering level 0 tile in the sample
+			// level_scale is set in a way that LOD level 1 is not scaled (level_scale=1) that works because we are not rendering level 0 tile in the sample
 			float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);
 			vec2 const model_pos = trn.position * model_scale;
 			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale*level_scale, model_scale*level_scale, 1});  // T*S
 			mat4 const local_to_screen = P*V*M;
 
 			int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716px
-			float const elevation_scale = (model_scale*level_scale) / (terrains.elevation_pixel_size(trn.level) * elevation_size);  //= 0.000107174
+			float const elevation_scale = calc_elevation_scale(terrains, trn, model_scale);  //= 0.000107174
 
 			if (features.show_terrain) {  // render terrain
 				draw_terrain(shader, trn,

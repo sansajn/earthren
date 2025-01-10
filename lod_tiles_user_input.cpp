@@ -36,12 +36,12 @@ void input_control_mode(SDL_Event const & event, input_mode & mode, input_events
 	//  handle pan mode
 	if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
 		mode.pan = true;
-		spdlog::info("left mouse pressed");
+		spdlog::debug("left mouse pressed");
 	}
 
 	if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
 		mode.pan = false;
-		spdlog::info("left mouse released");
+		spdlog::debug("left mouse released");
 	}
 
 	// rotation mode or detail camera
