@@ -13,6 +13,7 @@ See `test_print.cpp` sample for a guide to use print functions.
 
 TODO:
 - get aligne to numpy printing (vector, matrix) output
+- integration with fmt library
 > TODO: give numpy sample output */
 #pragma once
 #include <vector>

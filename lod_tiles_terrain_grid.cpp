@@ -102,7 +102,8 @@ vector<terrain> terrain_grid::load_level_tiles(path const & data_path, int level
 
 			// TODO: there we need level to proper calculate grid position
 			float const level_quad_size = (2.0f*quad_size) / grid_size(level);  // TODO: equation works for level 2 and 3, later we neeed to agree on a leveling
-			vec2 const word_pos = to_word_position(column, row, grid_size(level), level_quad_size);
+			vec2 const word_pos = to_word_position(column, row, grid_size(level), level_quad_size);  // TODO: rename to  world
+			spdlog::debug("{}: level={}, level_quad_size={}, word_pos={}", filename, level, level_quad_size, to_string(word_pos));
 
 			// - load elevation tile
 			auto const elevation_tile = create_texture_16b(file);

@@ -224,6 +224,13 @@ imgui/misc/natvis/imgui.natvis
 imgui/misc/single_file/imgui_single_file.h
 io.cpp
 io.hpp
+libs/geometry/boost_geometry_adapt.hpp
+libs/geometry/box2.hpp
+libs/geometry/box3.hpp
+libs/geometry/glmprint.hpp
+libs/geometry/readme.md
+libs/geometry/utility.cpp
+libs/geometry/utility.hpp
 lod_tiles.cpp
 lod_tiles_draw_terrain.cpp
 lod_tiles_draw_terrain.hpp
