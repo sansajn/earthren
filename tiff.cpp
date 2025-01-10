@@ -14,7 +14,7 @@ using std::tuple, std::byte,
 	std::numeric_limits;
 
 // Custom warning handler (does nothing to suppress warnings)
-static void suppress_tiff_warnings(char const * module, char const * fmt, va_list ap) {
+static void suppress_tiff_warnings([[maybe_unused]] char const * module, [[maybe_unused]] char const * fmt, [[maybe_unused]] va_list ap) {
 	// Do nothing, effectively suppressing warnings
 }
 
