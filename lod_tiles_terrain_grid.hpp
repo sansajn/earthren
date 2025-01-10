@@ -111,9 +111,9 @@ struct terrain_grid {
 	}
 
 	[[nodiscard]] int grid_size(int level) const;
-	[[nodiscard]] int elevation_tile_size(int level) const {return _data_desc.at(level).elevation_tile_size;}
-	[[nodiscard]] double elevation_pixel_size(int level) const {return _data_desc.at(level).elevation_pixel_size;}
-	[[nodiscard]] int satellite_tile_size(int level) const {return _data_desc.at(level).satellite_tile_size;}
+	[[nodiscard]] int elevation_tile_size(int level) const;
+	[[nodiscard]] double elevation_pixel_size(int level) const;
+	[[nodiscard]] int satellite_tile_size(int level) const;
 
 	float quad_size = 1.0f;
 

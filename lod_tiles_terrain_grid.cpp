@@ -139,10 +139,6 @@ vector<terrain> terrain_grid::load_level_tiles(path const & data_path, int level
 	return terrains;
 }
 
-size_t terrain_grid::size() const {
-	return _terrain_count;
-}
-
 struct terrain_finder {
 	terrain_finder(int grid_c, int grid_r) : grid_c{grid_c}, grid_r{grid_r} {}
 
@@ -243,6 +239,22 @@ void terrain_grid::load_description(path const & data_path, int level) {
 	// create list of elevation max values
 	for (auto const & kv : config.get_child("files"))  // TODO: this is work for transform function
 		_elevation_tile_max_value.insert(pair{path{kv.first}, kv.second.get<int>("maxval")});  // TODO: emplace?
+}
+
+size_t terrain_grid::size() const {
+	return _terrain_count;
+}
+
+int terrain_grid::elevation_tile_size(int level) const {
+	return _data_desc.at(level).elevation_tile_size;
+}
+
+double terrain_grid::elevation_pixel_size(int level) const {
+	return _data_desc.at(level).elevation_pixel_size;
+}
+
+int terrain_grid::satellite_tile_size(int level) const {
+	return _data_desc.at(level).satellite_tile_size;
 }
 
 terrain_grid::~terrain_grid() {
