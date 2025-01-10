@@ -283,9 +283,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			for (terrain const & trn : terrains.iterate()) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
 					if (&trn != camera_terrain) {  // we want to change only when we are over new terrain
-						int const texture_width = terrains.elevation_tile_size(trn.level),  //= 716
-							texture_height = terrains.elevation_tile_size(trn.level);  //!< we should introduce texture_size
-						float const elevation_scale = model_scale / (terrains.elevation_pixel_size(trn.level) * texture_width);  //= 0.000107174
+						int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716px
+						// TODO: we have two diferrent computatios of elevation_scale and tha is not right, unite
+						float const elevation_scale = model_scale / (terrains.elevation_pixel_size(trn.level) * elevation_size);  //= 0.000107174
 
 						terrain_grid::camera_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
 						camera_terrain = &trn;  // save for later comparison
@@ -302,12 +302,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		for (terrain const & trn : terrains.iterate()) {  // draw terrain grid
 			rendered_tile_count += 1;
 
-			float const level_scale = 1.0f / (pow(2.0f, trn.level - 1.0f) / 2.0f);  // this works only for level 2 and 3
+			float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);  // TODO: this works only for level 2 and 3
 			vec2 const model_pos = trn.position * model_scale;
 			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale*level_scale, model_scale*level_scale, 1});  // T*S
 			mat4 const local_to_screen = P*V*M;
 
-			int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716
+			int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716px
 			float const elevation_scale = (model_scale*level_scale) / (terrains.elevation_pixel_size(trn.level) * elevation_size);  //= 0.000107174
 
 			if (features.show_terrain) {  // render terrain
