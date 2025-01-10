@@ -101,8 +101,8 @@ vector<terrain> terrain_grid::load_level_tiles(path const & data_path, int level
 				row = stoi(row_str);
 
 			// TODO: there we need level to proper calculate grid position
-			float const level_quad_size = (2.0f*quad_size) / pow(2, level-1);  // TODO: equation works for level 2 and 3, later we neeed to agree on a leveling
-			vec2 const word_pos = to_word_position(column, row, level, level_quad_size);
+			float const level_quad_size = (2.0f*quad_size) / grid_size(level);  // TODO: equation works for level 2 and 3, later we neeed to agree on a leveling
+			vec2 const word_pos = to_word_position(column, row, grid_size(level), level_quad_size);
 
 			// - load elevation tile
 			auto const elevation_tile = create_texture_16b(file);
@@ -151,15 +151,15 @@ struct terrain_finder {
 // TODO: also change level for load_description()
 void terrain_grid::load_tiles(path const & data_path) {
 	// load terrains, for now let's assume level 1 and 2 only
-	auto const data_l2_path = data_path/"level1";
+	auto const data_l1_path = data_path/"level1";
 
-	load_description(data_l2_path, 2);  // read dataset description file for level 2 tiles
+	load_description(data_l1_path, 2);  // read dataset description file for level 2 tiles
 
-	vector<terrain> terrains_l2 = load_level_tiles(data_l2_path, 2);
+	vector<terrain> terrains_l1 = load_level_tiles(data_l1_path, 2);
 
-	// construct level 2 quad tree
-	assert(std::size(terrains_l2) == 4 && "this sample expect 4 level 2 quadtree tiles");
-	for (terrain & trn : terrains_l2) {
+	// construct level 1 quad tree
+	assert(std::size(terrains_l1) == 4 && "this sample expect 4 level 2 quadtree tiles");
+	for (terrain & trn : terrains_l1) {
 		int const idx = trn.grid_c + trn.grid_r * 2;
 		assert(idx <= 4 && "four terrains are expected, not more");
 		trn.level = 2;
@@ -167,7 +167,7 @@ void terrain_grid::load_tiles(path const & data_path) {
 		quad->data = trn;
 		_root.children[idx] = std::move(quad);
 	}
-	_terrain_count += std::size(terrains_l2);
+	_terrain_count += std::size(terrains_l1);
 	// TODO: cheeck all children are assigned (we need to do that, becaause grid_c or grid_r can goes wrong
 
 	// TODO: before we can load next level we somehow need to deal with description data from previous level stored as _elevation_tile_size, _satellite_tile_size, ...
@@ -260,8 +260,7 @@ terrain_grid::~terrain_grid() {
 
 namespace {
 
-vec2 to_word_position(int column, int row, int level, float quad_size) {
-	int const grid_size = pow(2, level-1);
+vec2 to_word_position(int column, int row, int grid_size, float quad_size) {
 	vec2 const position = vec2{column, -row} * quad_size - vec2{grid_size, -(grid_size-(2*1))} * quad_size*0.5f;
 	return position;
 }
