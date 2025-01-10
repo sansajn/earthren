@@ -24,8 +24,7 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	glm::vec3 color,
 	float height_scale,
 	float elevation_scale,
-	glm::mat4 local_to_screen,
-	render_features const & features);
+	glm::mat4 local_to_screen);
 
 //! Draws terrain light directions.
 void draw_terrain_light_directions(grid_of_terrains_lightdir_shader_program & shader,

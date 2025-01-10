@@ -329,8 +329,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 				draw_terrain_outlines(outline_shader, trn,
 					element_count,
 					rgb::blue,
-					ui.height_scale, elevation_scale, local_to_screen,
-					features);
+					ui.height_scale, elevation_scale, local_to_screen);
 			}			
 		}  // for (trn ...
 

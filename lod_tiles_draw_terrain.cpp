@@ -50,8 +50,7 @@ void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
 	vec3 color,
 	float height_scale,
 	float elevation_scale,
-	mat4 local_to_screen,
-	render_features const & features) {
+	mat4 local_to_screen) {
 
 	shader.use();
 
