@@ -1,0 +1,123 @@
+#!/bin/bash
+# Script to generate data for `grid_more_details` sample.
+
+# exit after first error
+set -e
+
+# - we want plzen tile to represent level 0 tile
+# - then we want to split level 0 tile into 4 tiles to generate level 1 tiles
+# - then we want to split each level 1 tile into 4 tiles to generate level 2 tiles (16 tiles)
+TARGET_PATH="../data/gen/lod_tiles"
+
+# if conda available activate earthren environment
+if command -v conda >/dev/null 2>&1; then
+	# Source the Conda initialization script
+	source "$(conda info --base)/etc/profile.d/conda.sh"
+	conda activate earthren
+	echo "earthren environment activated"
+fi
+
+rm -rf out
+
+mkdir out
+mkdir out/level0
+mkdir out/level1
+mkdir out/level2
+
+echo "--> generate elevation tiles"
+
+# generate level 0 tile
+echo "- level 0"
+cp ../data/plzen_elev.tif out/level0/plzen_elev_0_0.tif
+
+# generate level 1 tiles
+echo "- level 1"
+python3 split_tile_overlap.py --row-tiles 2 ../data/plzen_elev.tif
+
+# take level 1 elevation tiles and save them for later deployment
+mv out/plzen_elev_*.tif out/level1
+
+# generate level 2 tiles
+echo "- level 2"
+
+for tile in out/level1/plzen_elev_*.tif; do
+	# split tile
+	python3 split_tile_overlap.py --row-tiles 2 "$tile"
+	
+	# there we need to modify file names before move tiles
+	for new_tile in out/plzen_elev_*.tif; do
+		python3 rename_tile.py "$new_tile"
+	done
+
+	# move tiles to level2 folder
+	mv out/plzen_elev_*.tif out/level2
+done
+
+
+echo "--> generate satellite tiles"
+
+# generate level 0 tile
+echo "- level 0"
+cp ../data/plzen_rgb.tif out/level0/plzen_rgb_0_0.tif
+
+# generate level 1 tiles
+echo "- level 1"
+python3 split_tile.py --row-tiles 2 ../data/plzen_rgb.tif
+
+# take level 1 elevation tiles and save them for later deployment
+mv out/plzen_rgb_*.tif out/level1
+
+# generate level 2 tiles
+echo "- level 2"
+
+for tile in out/level1/plzen_rgb_*.tif; do
+	# split tile
+	python3 split_tile.py --row-tiles 2 "$tile"
+	
+	# there we need to modify file names before move tiles
+	for new_tile in out/plzen_rgb_*.tif; do
+		python3 rename_tile.py "$new_tile"
+	done
+
+	# move tiles to level2 folder
+	mv out/plzen_rgb_*.tif out/level2
+done
+
+
+echo "--> scale lower LOD tiles"
+
+echo "- level 0"
+for tile in out/level0/*.tif; do
+	gdal_translate -outsize 25% 25% $tile out/scaled.tif
+	rm $tile
+	mv out/scaled.tif $tile
+done
+
+echo "- level 1"
+for tile in out/level1/*.tif; do
+	gdal_translate -outsize 50% 50% $tile out/scaled.tif
+	rm $tile
+	mv out/scaled.tif $tile
+done
+
+
+echo "--> install tiles"
+mkdir -p $TARGET_PATH
+mv ./out/level* $TARGET_PATH
+echo "tile installed to $TARGET_PATH"
+
+
+echo "--> dataset description"
+python3 create_dataset_desc.py $TARGET_PATH/level0 1
+python3 create_dataset_desc.py $TARGET_PATH/level1 2
+python3 create_dataset_desc.py $TARGET_PATH/level2 4
+
+
+echo "--> clean"
+rm -r ./out
+
+echo "check result with"
+echo "  ls $TARGET_PATH"
+echo "command"
+
+echo "done!"

@@ -10,6 +10,8 @@ learn/tiles/
 learn/tiles_utm/
 learn/out
 
+script/out
+
 xy_plane
 xy_plane_grid
 xy_plane_panzoom
@@ -48,3 +50,5 @@ grid_of_terrains
 grid_of_terrains.ini
 more_details
 more_details.ini
+lod_tiles
+lod_tiles.ini

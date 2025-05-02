@@ -62,7 +62,11 @@ def build():
 	env.Program(['satellite_map.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp', 'tiff.cpp'])
 
 	# height_scale	sample
-	imgui = env.StaticLibrary([
+	imgui_env = env.Clone(
+		CCFLAGS=['-Wno-deprecated-enum-enum-conversion']  # disable warnings within the library
+	)
+
+	imgui = imgui_env.StaticLibrary([
 		Glob('imgui/*.cpp'),
 		'imgui/examples/imgui_impl_sdl.cpp',  # TODO: maybe we do not need this backend for SDL
 		'imgui/examples/imgui_impl_opengl3.cpp',  # backend for opengl es3
@@ -98,7 +102,7 @@ def build():
 
 	# above terrain
 	above_terrain_common = ['free_camera.cpp', 'texture.cpp', 'shader.cpp',
-		'tiff.cpp', 'io.cpp']
+		'tiff.cpp', 'fs.cpp']
 
 	env.Program(['above_terrain.cpp', above_terrain_common, 'flat_shader.cpp', 'quad.cpp',
 		'axes_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
@@ -119,6 +123,10 @@ def build():
 		'grid_of_terrains_lightdir_shader_program.cpp', 'terrain_camera.cpp']
 
 	env.Program(['more_details.cpp', 'more_details_terrain_grid.cpp', more_details_common, imgui])
+
+	# lod tiles
+	env.Program(['lod_tiles.cpp', 'lod_tiles_terrain_grid.cpp',
+		'lod_tiles_user_input.cpp', 'lod_tiles_draw_terrain.cpp', more_details_common, imgui])
 
 	# other samples ...
 
