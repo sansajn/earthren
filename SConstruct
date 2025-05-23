@@ -53,6 +53,7 @@ def build():
 	env.Program(['xy_plane_panzoom.cpp'])
 	env.Program(['xy_plane_grid.cpp'])
 	env.Program(['texture_storage.cpp'])
+	env.Program(['triangle.cpp'])
 	env.Program(['texture_storage_tiff.cpp'])
 	env.Program(['xy_plane_texture.cpp'])
 	env.Program(['xy_plane_grid_textured.cpp'])
@@ -156,6 +157,7 @@ def build():
 	env.Program(['ogl_shape.cpp', 'shape.cpp', 'shape_mesh.cpp', 'mesh_draw.cpp', ogl_src])
 
 	env.Program(['simple_shading.cpp'])  # this will serve as a base sample for ogl
+
 
 def configure(env, dependency_list):
 	conf = env.Configure(

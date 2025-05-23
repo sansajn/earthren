@@ -310,6 +310,7 @@ to_line.gs
 to_line_v0.gs
 to_normal.gs
 to_outline.gs
+triangle.cpp
 xy_plane.cpp
 xy_plane_grid.cpp
 xy_plane_grid_textured.cpp
