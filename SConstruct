@@ -53,7 +53,6 @@ def build():
 	env.Program(['xy_plane_panzoom.cpp'])
 	env.Program(['xy_plane_grid.cpp'])
 	env.Program(['texture_storage.cpp'])
-	env.Program(['triangle.cpp'])
 	env.Program(['texture_storage_tiff.cpp'])
 	env.Program(['xy_plane_texture.cpp'])
 	env.Program(['xy_plane_grid_textured.cpp'])
@@ -88,6 +87,10 @@ def build():
 		'tiff.cpp', 'fs.cpp']
 
 	env.Program(['height_scale.cpp', height_scale_common, imgui])
+
+	# triangle sample
+	triangle_objs = ['shader.cpp']
+	env.Program(['triangle.cpp', triangle_objs])
 
 	# four terrain sample
 	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',

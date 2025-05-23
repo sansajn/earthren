@@ -1,50 +1,53 @@
 /* Sample to draw triangle to NDC (Normalized Device Coordinate) space (-1,-1), (1,1), can serve as basic sample */
 #include <string>
 #include <cassert>
-#include <GL/glew.h>
-#include <GL/freeglut.h>
+#include <iostream>
+#include <SDL.h>
+#include <GLES3/gl32.h>
+#include "shader.hpp"
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
-char const * vs_src = "#version 330\n\
-							  layout(location=0) in vec3 position;\n\
-							  layout(location=1) in vec4 color;\n\
-							  out VS_OUT {\n\
-								  vec4 color;\n\
-							  } vs_out;\n\
-							  void main() {\n\
-								  vs_out.color = color;\n\
-								  gl_Position = vec4(position, 1.0f);\n\
-							  }\n";
+using std::cout, std::endl;
 
-char const * fs_src = "#version 330\n\
-							  in VS_OUT {\n\
-								  vec4 color;\n\
-							  } fs_in;\n\
-							  out vec4 fcolor;\n\
-							  void main() {\n\
-								  fcolor = fs_in.color;\n\
-							  }\n";
+constexpr GLuint WIDTH = 800,
+	HEIGHT = 600;
 
-void init(int argc, char * argv[]);
+char const * vs_src = R"(
+#version 320 es
+in vec3 position;  // we expect NDC (-1,-1), (1,1) rectangle
+void main() {
+	gl_Position = vec4(position, 1.0f);
+})";
 
+char const * fs_src = R"(
+#version 320 es
+precision mediump float;
+out vec4 frag_color;
+void main() {
+	frag_color = vec4(1,0,0,1);  // red
+})";
 
-int main(int argc, char * argv[])
-{
-	init(argc, argv);
+int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
+	SDL_Init(SDL_INIT_VIDEO);
+	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED,
+		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
 
-	GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vs, 1, &vs_src, nullptr);
-	glCompileShader(vs);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
 
-	GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fs, 1, &fs_src, nullptr);
-	glCompileShader(fs);
+	SDL_GLContext context = SDL_GL_CreateContext(window);
 
-	GLuint prog = glCreateProgram();
-	glAttachShader(prog, vs);
-	glAttachShader(prog, fs);
-	glLinkProgram(prog);
+	cout << "GL_VENDOR: " << glGetString(GL_VENDOR) << "\n"
+		<< "GL_VERSION: " << glGetString(GL_VERSION) << "\n"
+		<< "GL_RENDERER: " << glGetString(GL_RENDERER) << "\n"
+		<< "GLSL_VERSION: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
+
+	GLuint const shader_program = get_shader_program(vs_src, fs_src);
+
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glViewport(0, 0, WIDTH, HEIGHT);
 
 	GLfloat vertices[] = {
 		-.5f, -.5f, .0f,
@@ -74,33 +77,25 @@ int main(int argc, char * argv[])
 	glVertexAttribPointer(color_attr_id, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(3*3*sizeof(GLfloat)));
 	glEnableVertexAttribArray(color_attr_id);
 
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-	glUseProgram(prog);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	glutSwapBuffers();
+	glUseProgram(shader_program);
 
-	glutMainLoop();
+	while (true) {
+		SDL_Event event;
+		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
+			break;
 
-	glDeleteShader(vs);
-	glDeleteShader(fs);
-	glDeleteProgram(prog);
+		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		assert(glGetError() == GL_NO_ERROR && "opengl error");
+
+		SDL_GL_SwapWindow(window);
+	}
+
+	glDeleteProgram(shader_program);
+
+	SDL_GL_DeleteContext(context);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
 
 	return 0;
-}
-
-void init(int argc, char * argv[])
-{
-	// glut
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DEPTH|GLUT_DOUBLE|GLUT_RGBA);
-	glutInitContextVersion(4, 0);
-	glutInitContextFlags(GLUT_CORE_PROFILE|GLUT_DEBUG);
-	glutInitWindowSize(800, 600);
-	glutCreateWindow("OpenGL triangle");
-
-	// glew
-	glewExperimental = GL_TRUE;
-	GLenum err = glewInit();
-	assert(err == GLEW_OK && "glew init failed");
-	glGetError();  // eat error
 }

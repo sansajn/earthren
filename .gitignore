@@ -59,6 +59,7 @@ lod_camera
 lod_camera.ini
 generate_dump
 simple_shading
+triangle
 
 ogl_buffer
 ogl_mesh

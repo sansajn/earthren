@@ -41,7 +41,7 @@ GLuint create_texture(std::string const & fname);
 
 GLint get_shader_program(char const * vertex_shader_source, char const * fragment_shader_source);
 
-int main(int argc, char * argv[]) {
+int main([[nmaybe_unused]] int argc, [[nmaybe_unused]] char * argv[]) {
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED, 
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
