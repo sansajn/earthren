@@ -38,14 +38,13 @@ i: print transformations info */
 #include "imgui/imgui.h"
 #include "imgui/examples/imgui_impl_sdl.h"
 #include "geometry/glmprint.hpp"
-// #include "camera.hpp"  // want to use custom camera implementation
 #include "color.hpp"
 #include "free_camera.hpp"
 #include "texture.hpp"
 #include "shader.hpp"
-#include "io.hpp"
+#include "fs.hpp"
 #include "terrain_scale_ui.hpp"
-#include "axes_model.hpp"
+#include "axis_model.hpp"
 #include "quad.hpp"
 #include "flat_shader.hpp"
 #include "height_overlap_shader_program.hpp"
@@ -290,27 +289,6 @@ bool is_above(terrain const & trn, float quad_size, float model_scale, vec3 cons
 	return bg::intersects(vec2{pos}, tile_area);
 }
 
-// three lines
-constexpr float axis_verts[] = {
-	0,0,0, 1,0,0,  // x
-	0,0,0, 0,1,0,  // y
-	0,0,0, 0,0,1  // z
-};
-
-GLuint push_data(void const * data, size_t size_in_bytes) {
-	// the implementation is not reusable, because we are creating a buffer and also unbins buffer after (this can be slow fo more bufffers).
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, size_in_bytes, data, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbind
-	return vbo;
-}
-
-GLuint push_axes() {
-	return push_data(axis_verts, sizeof(axis_verts));
-}
-
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
@@ -371,9 +349,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	flat_shader_program flat_shader{flat_shader_program_id};
 
-	// load axes model
-	GLuint const axes_position_vbo = push_axes();
-	axes_model axes{axes_position_vbo};
+	axis_model axes;
 
 	// load textures
 	constexpr size_t grid_rows = 2,

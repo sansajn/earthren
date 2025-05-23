@@ -1,7 +1,7 @@
-/* OpenGL ES 3.2, terrain with heights from height map texture and proper scaling.
+/* OpenGL ES 3.2, terrain with camera distance LOD.
 Usage: terrain_quad [DEM_FILE]
 o: show/hide outline
-c: reset view
+c: reset view to defaults
 p: set camera to predefined position (so we can compare render result)
 t: show/hide terain render (to more focus on outline or normals)
 s: show/hide satellite texture
@@ -40,7 +40,6 @@ i: print transformations info */
 #include "geometry/glmprint.hpp"
 #include "color.hpp"
 #include "free_camera.hpp"
-#include "texture.hpp"
 #include "shader.hpp"
 #include "fs.hpp"
 #include "terrain_scale_ui.hpp"
@@ -50,8 +49,14 @@ i: print transformations info */
 #include "height_overlap_shader_program.hpp"
 #include "above_terrain_outline_shader_program.hpp"
 #include "grid_of_terrains_lightdir_shader_program.hpp"
-#include "more_details_terrain_grid.hpp"
 #include "terrain_camera.hpp"
+#include "lod_tiles_user_input.hpp"  // usser input handling (keyboard, mouse)
+#include "lod_camera_terrain_grid.hpp"
+#include "lod_camera_draw_terrain.hpp"
+#include "shape.hpp"
+#include "shape_mesh.hpp"
+#include "shade_shader.hpp"
+#include "mesh_draw.hpp"
 
 using std::vector, std::string, std::pair, std::byte, std::size;
 using std::tuple, std::get;
@@ -66,7 +71,7 @@ using glm::mat4, glm::mat3,
 	glm::vec4, glm::vec3, glm::vec2,
 	glm::value_ptr,
 	glm::perspective,
-	glm::translate,
+	glm::translate, glm::scale,
 	glm::inverseTranspose,
 	glm::radians;
 
@@ -84,44 +89,12 @@ path const LIGHTDIR_VERTEX_SHADER_FILE = "height_map_lightdir.vs",
 	LIGHTDIR_GEOMETRY_SHADER_FILE = "to_line.gs",
 	LIGHTDIR_FRAGMENT_SHADER_FILE = "colored.fs";
 
-path const config_file_path = "more_details.ini",
-	data_path = "data/gen/more_details";
+path const config_file_path = "lod_camera.ini",
+	data_path = "data/gen/lod_tiles";
 
 void verbose_signal_handler(int signal);
 
 constexpr float pi = glm::pi<float>();
-
-struct input_mode {  // list of active input contol modes
-	bool pan = false,
-		rotate = false;
-	bool detail_camera = false;
-
-	// in case of detail camera used (free_camera)
-	bool move_forward = false,  // w
-		move_backkward = false,  // s
-		move_left = false,  // a
-		move_right = false;  // d
-};
-
-struct input_events {
-	bool zoom_in;
-	bool camera_switch;
-	bool info_request;
-
-	input_events() : zoom_in{false}, camera_switch{false}, info_request{false} {}
-
-	void reset() {
-		zoom_in = camera_switch = info_request = false;
-	}
-};
-
-struct render_features {  // list of selected rendering features
-	bool show_terrain,
-		show_lightdir,
-		show_outline,
-		show_satellite,
-		calculate_shades;
-};
 
 /*! Process user input.
 \returns false in case user want to quit, otherwise true. */
@@ -129,49 +102,21 @@ template <typename Camera>
 bool input(Camera & cam, input_mode & mode, render_features & features,
 	input_events & events);
 
-// input handling functions
-void input_render_features(SDL_Event const & event, render_features & features);
-void input_control_mode(SDL_Event const & event, input_mode & mode, input_events & events);  //!< handle pan/rotate modes
-void input_camera(SDL_Event const & event, terrain_camera & cam, input_mode const & mode,
-	input_events & events);  //!< handle camera movement, rotations
-void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
-	input_events & events);  //!< handle camera movement, rotations
-
 void update(free_camera & cam, input_mode const & mode, float dt);
 
-// Draw helpers
-
-//! Draws terrain quad with elevations and sattelite texture.
-void draw_terrain(height_overlap_shader_program & shader,
-	terrain const & trn,
-	unsigned int element_count,  //!< number of quad mesh triengle elements to draw
-	mat4 const & local_to_screen,
-	size_t elevation_size,  //!< elevaation texture size in pixels
-	float height_scale, float elevation_scale,
-	render_features const & features);
-
-//! Draws terrain quad as mesh.
-void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
-	terrain const & trn,
-	unsigned int element_count,  // number of quad mesh triengle elements to draw
-	vec3 color,
-	float height_scale,
-	float elevation_scale,
-	mat4 local_to_screen,
-	render_features const & features);
-
-//! Draws terrain light directions.
-void draw_terrain_light_directions(grid_of_terrains_lightdir_shader_program & shader,
-	terrain const & trn,
-	unsigned int element_count,
-	float height_scale,
-	float elevation_scale,
-	mat4 local_to_screen);
+float calc_elevation_scale(terrain_grid const & terrains, terrain const & trn, float model_scale) {
+	float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);  //= 1 (for LOD level 1)
+	int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716px
+	float const elevation_scale = (model_scale*level_scale) / (terrains.elevation_pixel_size(trn.level) * elevation_size);  //= 0.000107174
+	return elevation_scale;
+}
 
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	signal(SIGSEGV, verbose_signal_handler);
 	spdlog::set_pattern("[%H:%M:%S.%e] [%l] %v");
+	// uncomment following to switch to debug verbocity level
+	spdlog::set_level(spdlog::level::debug);
 
 	// process arguments
 	string const title = string{path{argv[0]}.stem()} + " (OpenGL ES 3.2)"s;
@@ -220,6 +165,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	flat_shader_program flat_shader{flat_shader_program_id};
 
 	axis_model axis;
+
+	// - create sphere data
+	shade_shader_program shade_shader;
+	ogl::mesh sphere = make_mesh(make_sphere(1.0f, 16, 16));  // generate_sphere -> make_mesh(generate_sphere())
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
@@ -289,6 +238,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			V = cam_detail.view();
 		}
 
+
+
 		if (events.camera_switch)
 			cout << with_label{"V", V};
 
@@ -323,17 +274,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		assert(size(terrains) > 0 && "we expect at least one terrain to render something");
 
+		terrains.update_camera(cam.position());
+
 		if (prev_cam_pos != cam.position()) {  // on camera move
 			for (terrain const & trn : terrains.iterate()) {  // find terrain under camera and set ground_height
 				if (is_above(trn, quad_size, model_scale, cam.position())) {
 					if (&trn != camera_terrain) {  // we want to change only when we are over new terrain
-						int const texture_width = terrains.elevation_tile_size(trn.level),  //= 716
-							texture_height = terrains.elevation_tile_size(trn.level);  //!< we should introduce texture_size
-						float const elevation_scale = model_scale / (terrains.elevation_pixel_size(trn.level) * texture_width);  //= 0.000107174
-
+						float const elevation_scale = calc_elevation_scale(terrains, trn, model_scale);  //= 0.000107174
 						terrain_grid::camera_ground_height = trn.elevation_min * elevation_scale * ui.height_scale;
 						camera_terrain = &trn;  // save for later comparison
-						cout << "camera-ground-height=" << terrain_grid::camera_ground_height << '\n';
+						spdlog::info("cameraground-height={}", terrain_grid::camera_ground_height);
 					}
 					break;
 				}
@@ -346,13 +296,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		for (terrain const & trn : terrains.iterate()) {  // draw terrain grid
 			rendered_tile_count += 1;
 
-			float const level_scale = 1.0f / (pow(2.0f, trn.level - 1.0f) / 2.0f);  // this works only for level 2 and 3
+			// level_scale is set in a way that LOD level 1 is not scaled (level_scale=1) that works because we are not rendering level 0 tile in the sample
+			float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);
 			vec2 const model_pos = trn.position * model_scale;
 			mat4 const M = scale(translate(mat4{1}, vec3{model_pos,0}), vec3{model_scale*level_scale, model_scale*level_scale, 1});  // T*S
 			mat4 const local_to_screen = P*V*M;
 
-			int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716
-			float const elevation_scale = (model_scale*level_scale) / (terrains.elevation_pixel_size(trn.level) * elevation_size);  //= 0.000107174
+			int const elevation_size = terrains.elevation_tile_size(trn.level);  //= 716px
+			float const elevation_scale = calc_elevation_scale(terrains, trn, model_scale);  //= 0.000107174
 
 			if (features.show_terrain) {  // render terrain
 				draw_terrain(shader, trn,
@@ -369,15 +320,45 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 			}
 
 			if (features.show_outline) {  // render wireframe
+				vec3 const wireframe_color = (camera_terrain == &trn) ? rgb::yellow : rgb::blue;
 				draw_terrain_outlines(outline_shader, trn,
 					element_count,
-					rgb::blue,
-					ui.height_scale, elevation_scale, local_to_screen,
-					features);
+					wireframe_color,
+					ui.height_scale, elevation_scale, local_to_screen);
 			}			
 		}  // for (trn ...
 
-		glBindVertexArray(0);  // unbind VAO
+		glBindVertexArray(0);  // unbind terrain VAO
+
+		// render terrain positions
+		{
+			shade_shader.use();
+			shade_shader.color(rgb::red);
+			shade_shader.light_direction(glm::normalize(vec3{1,1,1}	));  // light pos is in view space
+
+			sphere.bind();
+
+			constexpr float sphere_scale = 0.025f;
+
+			for (size_t idx = 0; terrain const & trn : terrains.iterate()) {
+				float const elevation_scale = calc_elevation_scale(terrains, trn, model_scale);  //= 0.000107174
+				float const height = trn.elevation_min * elevation_scale * ui.height_scale;
+				vec2 const model_pos = trn.position * model_scale;
+				mat4 const M = scale(translate(mat4{1}, vec3{model_pos,height}), vec3{sphere_scale, sphere_scale, sphere_scale});  // T*S
+				mat4 const local_to_screen = P*V*M;
+				mat3 const normal_to_view = mat3{inverseTranspose(M)};
+
+				shade_shader.local_to_screen(local_to_screen);
+				shade_shader.normal_to_view(normal_to_view);
+
+				mesh_draw(sphere);
+
+				spdlog::trace("#{}: terrain-pos=({},{})", idx, model_pos.x, model_pos.y);
+				++idx;
+			}
+
+			glBindVertexArray(0);  // unbind current VAO
+		}
 
 		// render axis
 		flat_shader.use();
@@ -387,13 +368,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		// T*S*R
 		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25, -2.45, -5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
-			axes_local_to_screen = P*M_axes*cam_rot;  //= P*V*V'*M_axes
+			axes_local_to_screen = P*M_axes*cam_rot;  //= P*V*V'*M_axes  TODO: this needs more description
 
 		axis.draw(flat_shader, axes_local_to_screen);
 
 		ui.render();
 
 		SDL_GL_SwapWindow(window);
+
+		spdlog::trace("loop-end");
 	}  // while
 	
 	destroy_quad_mesh(vao, vbo, ibo);
@@ -405,271 +388,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	SDL_Quit();
 	
 	return 0;
-}
-
-void draw_terrain(height_overlap_shader_program & shader,
-	terrain const & trn,
-	unsigned int element_count,
-	mat4 const & local_to_screen,
-	size_t elevation_size,
-	float height_scale, float elevation_scale,
-	render_features const & features) {
-
-	shader.use();
-
-	// bind height map texture
-	shader.heights(0);  // set height map sampler to use texture unit 0
-	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-	glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a height texture to active texture unit (0)
-
-	if (features.show_satellite) {
-		shader.use_satellite_map(true);
-		shader.satellite_map(1);  // set satellite map sampler to use texture unit 1
-		glActiveTexture(GL_TEXTURE1);  // activate texture unit 1
-		glBindTexture(GL_TEXTURE_2D, trn.satellite_map);  // bind a satellite texture to active texture unit (1)
-	}
-	else
-		shader.use_satellite_map(false);
-
-	if (features.calculate_shades)
-		shader.use_shading(true);
-	else
-		shader.use_shading(false);
-
-	constexpr float elevation_tile_pixel_size = 26.063200588611451;  // see gdalinfo
-
-	shader.terrain_size(elevation_size * elevation_tile_pixel_size);
-	shader.elevation_tile_size(elevation_size);
-	shader.normal_tile_size(elevation_size - 4);  // 2px border
-	shader.height_scale(height_scale);
-	shader.elevation_scale(elevation_scale);
-	shader.local_to_screen(local_to_screen);
-
-	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-}
-
-void draw_terrain_outlines(above_terrain_outline_shader_program & shader,
-	terrain const & trn,
-	unsigned int element_count,  // number of quad mesh triengle elements to draw
-	vec3 color,
-	float height_scale,
-	float elevation_scale,
-	mat4 local_to_screen,
-	render_features const & features) {
-
-	shader.use();
-
-	shader.fill_color(color);
-
-	// bind height map
-	shader.elevation_map(0);  // set sampler s to use texture unit 0
-	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-	glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a texture to active texture unit (0)
-
-	shader.elevation_scale(elevation_scale);
-	shader.height_scale(height_scale);
-	shader.local_to_screen(local_to_screen);
-
-	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-}
-
-void draw_terrain_light_directions(grid_of_terrains_lightdir_shader_program & shader,
-	terrain const & trn,
-	unsigned int element_count,
-	float height_scale,
-	float elevation_scale,
-	mat4 local_to_screen) {
-
-	shader.use();
-	shader.fill_color(rgb::yellow);
-
-	// bind height map
-	shader.elevation_map(0);  // set sampler s to use texture unit 0
-	glActiveTexture(GL_TEXTURE0);  // activate texture unit 0
-	glBindTexture(GL_TEXTURE_2D, trn.elevation_map);  // bind a texture to active texture unit (0)
-
-	shader.elevation_scale(elevation_scale);
-	shader.height_scale(height_scale);
-	shader.local_to_screen(local_to_screen);
-
-	glDrawElements(GL_TRIANGLES, element_count, GL_UNSIGNED_INT, 0);
-}
-
-
-// handling render features
-void input_render_features(SDL_Event const & event, render_features & features) {
-	if (event.type == SDL_KEYDOWN) {
-		switch (event.key.keysym.sym) {
-		case SDLK_l:
-			features.show_lightdir = !features.show_lightdir;
-			spdlog::info("show_lightdir={}", features.show_lightdir);
-			break;
-		case SDLK_o:
-			features.show_outline = !features.show_outline;
-			spdlog::info("show_outline={}", features.show_outline);
-			break;
-		case SDLK_t:
-			features.show_terrain = !features.show_terrain;
-			spdlog::info("show_terrain={}", features.show_terrain);
-			break;
-		case SDLK_s:
-			features.show_satellite = !features.show_satellite;
-			spdlog::info("show_satellite={}", features.show_satellite);
-			break;
-		case SDLK_a:
-			features.calculate_shades = !features.calculate_shades;
-			spdlog::info("calculate_shadess={}", features.calculate_shades);
-			break;
-		}
-	}
-}
-
-void input_control_mode(SDL_Event const & event, input_mode & mode, input_events & events) {
-	//  handle pan mode
-	if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-		mode.pan = true;
-		spdlog::info("left mouse pressed");
-	}
-
-	if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
-		mode.pan = false;
-		spdlog::info("left mouse released");
-	}
-
-	// rotation mode or detail camera
-	if (event.type == SDL_KEYDOWN) {
-		switch (event.key.keysym.sym) {
-		case SDLK_LCTRL:  // enable camera rotation state
-			mode.rotate = true;
-			break;
-
-		case SDLK_f:  // switch detail camera mode on/off
-			mode.detail_camera = !mode.detail_camera;
-			events.camera_switch = true;
-			spdlog::info("detail-camera={}", mode.detail_camera);
-			break;
-
-		// detail camera input modes
-		case SDLK_w:
-			mode.move_forward = true;
-			break;
-
-		case SDLK_s:
-			mode.move_backkward = true;
-			break;
-
-		case SDLK_a:
-			mode.move_left = true;
-			break;
-
-		case SDLK_d:
-			mode.move_right = true;
-			break;
-
-
-		// info request event
-		case SDLK_i:
-			events.info_request = true;
-			break;
-		}
-	}
-	else if (event.type == SDL_KEYUP) {
-		switch (event.key.keysym.sym) {
-		case SDLK_LCTRL:  // disable camera rotation state
-			mode.rotate = false;
-			break;
-
-		// detail camera input modes
-		case SDLK_w:
-			mode.move_forward = false;
-			break;
-
-		case SDLK_s:
-			mode.move_backkward = false;
-			break;
-
-		case SDLK_a:
-			mode.move_left = false;
-			break;
-
-		case SDLK_d:
-			mode.move_right = false;
-			break;
-		}
-	}
-}
-
-void input_camera(SDL_Event const & event, terrain_camera & cam, input_mode const & mode,
-	input_events & events) {
-	// distance
-	if (event.type == SDL_MOUSEWHEEL) {
-		assert(event.wheel.direction == SDL_MOUSEWHEEL_NORMAL);
-
-		if (event.wheel.y > 0) {  // scroll up
-			cam.distance /= 1.1;
-			events.zoom_in = true;
-		}
-		else if (event.wheel.y < 0)  // scroll down
-			cam.distance *= 1.1;
-
-		spdlog::info("distance={}", cam.distance);
-	}
-
-	// reset
-	if (event.type == SDL_KEYDOWN) {
-		switch (event.key.keysym.sym) {
-		case SDLK_c:  // reset camera
-			cam = terrain_camera{20.0f};
-			cam.look_at = {0, 0};
-			break;
-		case SDLK_p:  // set camera to predefined position
-			cam = terrain_camera{2.97287f};
-			cam.look_at = {0, 0};
-			cam.theta = 0.599999f;
-			cam.phi = 0.62;
-			break;
-		}
-	}
-
-	// pan and rotation
-	if (mode.pan && event.type == SDL_MOUSEMOTION) {
-		vec2 ds = vec2{event.motion.xrel, -event.motion.yrel};
-		if (mode.rotate) {
-			cam.phi -= ds.x / 500.0f;
-			cam.theta += ds.y / 500.0f;
-		}
-		else  // pan
-			cam.look_at -= ds * 0.01f;
-	}
-}
-
-void input_camera(SDL_Event const & event, free_camera & cam, input_mode const & mode,
-	[[maybe_unused]] input_events & events) {
-
-	constexpr float dt = 0.1f;
-	constexpr float angular_speed = 1.0f/100.0f;  // rad/s
-
-	// handle mouse movement when ctrl is pressed to rotate camera
-	if (mode.pan && event.type == SDL_MOUSEMOTION) {
-		vec2 ds = vec2{event.motion.xrel, -event.motion.yrel};
-		if (mode.rotate) {
-			vec3 const up = vec3{0,0,1};
-
-			if (ds.x != 0.0f) {
-				float const angle = ds.x * angular_speed * dt;
-				cam.rotation = normalize(angleAxis(-angle, up) * cam.rotation);
-			}
-			if (ds.y != 0.0f) {
-				float angle = ds.y * angular_speed * dt;
-				cam.rotation = normalize(angleAxis(-angle, cam.right()) * cam.rotation);
-			}
-		}
-
-		// note: pan is not supported for free_camera
-	}
-
-	// handle reset
-	// note: we do not want to handle mouse wheel
 }
 
 template <typename Camera>
@@ -692,7 +410,6 @@ bool input(Camera & cam, input_mode & mode, render_features & features,
 
 		if (imgui_mouse_captured || imgui_keyboard_captured)
 			continue; // If ImGui wants to capture the event, skip further processing
-
 
 		input_control_mode(event, mode, events);
 		input_camera(event, cam, mode, events);

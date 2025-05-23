@@ -24,14 +24,14 @@ height_overlap_shader_program::height_overlap_shader_program() {
 	_position = glGetAttribLocation(_prog, "position");
 	assert(_position == 0 && "we are expecting position location ID is set to 0");
 
-	// vertex
+	// vertex uniforms
 	_local_to_screen = glGetUniformLocation(_prog, "local_to_screen");
 	_heights = glGetUniformLocation(_prog, "heights");
 	_elevation_scale = glGetUniformLocation(_prog, "elevation_scale");
 	_height_scale = glGetUniformLocation(_prog, "height_scale");
 	_normal_tile_size = glGetUniformLocation(_prog, "normal_tile_size");
 
-	// fragment
+	// fragment uniforms
 	_satellite_map = glGetUniformLocation(_prog, "satellite_map");
 	_use_satellite_map = glGetUniformLocation(_prog, "use_satellite_map");
 	_use_shading = glGetUniformLocation(_prog, "use_shading");

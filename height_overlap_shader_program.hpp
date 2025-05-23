@@ -7,7 +7,6 @@
 class height_overlap_shader_program {
 public:
 	height_overlap_shader_program();
-	~height_overlap_shader_program();
 	void use();
 	void local_to_screen(glm::mat4 const & T);
 	void heights(int texture_unit_id);  //!< Set elevation data.
@@ -19,7 +18,8 @@ public:
 	void terrain_size(float size);  //!< terrain size in real world units e.g. meters
 	void elevation_tile_size(float size);
 	void normal_tile_size(float size);
-	GLint position_location() const;
+	[[nodiscard]] GLint position_location() const;
+	~height_overlap_shader_program();
 
 private:
 	GLuint _prog;  //!< Shader program ID.

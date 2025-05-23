@@ -43,7 +43,7 @@ i: print transformations info */
 #include "shader.hpp"
 #include "fs.hpp"
 #include "terrain_scale_ui.hpp"
-#include "axes_model.hpp"
+#include "axis_model.hpp"
 #include "quad.hpp"
 #include "flat_shader.hpp"
 #include "height_overlap_shader_program.hpp"
@@ -99,27 +99,6 @@ bool input(Camera & cam, input_mode & mode, render_features & features,
 	input_events & events);
 
 void update(free_camera & cam, input_mode const & mode, float dt);
-
-// three lines
-constexpr float axis_verts[] = {
-	0,0,0, 1,0,0,  // x
-	0,0,0, 0,1,0,  // y
-	0,0,0, 0,0,1  // z
-};
-
-GLuint push_data(void const * data, size_t size_in_bytes) {
-	// the implementation is not reusable, because we are creating a buffer and also unbins buffer after (this can be slow fo more bufffers).
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, size_in_bytes, data, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);  // unbind
-	return vbo;
-}
-
-GLuint push_axes() {
-	return push_data(axis_verts, sizeof(axis_verts));
-}
 
 float calc_elevation_scale(terrain_grid const & terrains, terrain const & trn, float model_scale) {
 	float const level_scale = 1.0f / (terrains.grid_size(trn.level) / 2.0f);  //= 1 (for LOD level 1)
@@ -181,9 +160,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	flat_shader_program flat_shader{flat_shader_program_id};
 
-	// load axes model
-	GLuint const axes_position_vbo = push_axes();
-	axes_model axes{axes_position_vbo};
+	axis_model axis;
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glViewport(0, 0, WIDTH, HEIGHT);
@@ -350,7 +327,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25, -2.45, -5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
 			axes_local_to_screen = P*M_axes*cam_rot;  //= P*V*V'*M_axes
 
-		axes.draw(flat_shader, axes_local_to_screen);
+		axis.draw(flat_shader, axes_local_to_screen);
 
 		ui.render();
 

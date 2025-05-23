@@ -12,6 +12,9 @@ learn/out
 
 script/out
 
+# doxygen generated file (documentation)
+doxygen/
+
 xy_plane
 xy_plane_grid
 xy_plane_panzoom
@@ -52,3 +55,13 @@ more_details
 more_details.ini
 lod_tiles
 lod_tiles.ini
+lod_camera
+lod_camera.ini
+generate_dump
+simple_shading
+
+ogl_buffer
+ogl_mesh
+ogl_mesh_indexed
+ogl_mesh_draw
+ogl_shape

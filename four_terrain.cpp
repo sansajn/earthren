@@ -43,10 +43,10 @@ i: print transformations info */
 #include "free_camera.hpp"
 #include "texture.hpp"
 #include "shader.hpp"
-#include "io.hpp"
+#include "fs.hpp"
 #include "flat_shader.hpp"
 #include "four_terrain_ui.hpp"
-#include "axes_model.hpp"
+#include "axis_model.hpp"
 #include "quad.hpp"
 #include "four_terrain_shader_program.hpp"
 
@@ -244,9 +244,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	flat_shader_program flat_shader{flat_shader_program_id};
 
-	// load axes model
-	GLuint const axes_position_vbo = push_axes();
-	axes_model axes{axes_position_vbo};
+	axis_model axis;
 
 	// load textures
 	constexpr size_t grid_rows = 2,
@@ -429,7 +427,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		mat4 const M_axes = scale(translate(mat4{1}, vec3{-3.25,-2.45,-5}), vec3{0.5, 0.5, 0.5}),  // put axis into the middle
 			axes_local_to_screen = P*M_axes*cam_rot;  //=P*V*V'*M_axes
 
-		axes.draw(flat_shader, axes_local_to_screen);
+		axis.draw(flat_shader, axes_local_to_screen);
 
 		ui.render();
 

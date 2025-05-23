@@ -44,7 +44,7 @@ for tile in out/level1/plzen_elev_*.tif; do
 	# split tile
 	python3 split_tile_overlap.py --row-tiles 2 "$tile"
 	
-	# there we need to modify file names before move tiles
+	# there we need to modify file names before move tiles to correspond with new tile level
 	for new_tile in out/plzen_elev_*.tif; do
 		python3 rename_tile.py "$new_tile"
 	done

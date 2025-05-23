@@ -1,6 +1,18 @@
+/*! \file */
 #include <utility>
 #include <vector>
 
+// TODO: missing description how set_uniform is meant to be used
+
+// TODO: define doxygen setter group there
+
+/*! Uniform setter helpers.
+\code
+mat4 T = transform_matrix();
+GLuint prog_id = create_shader_program();
+GLint _local_to_screen = glGetUniformLocation(prog_id, "local_to_screen");
+set_uniform(_local_to_screen, T);
+\endcode */
 template <typename T>
 void set_uniform(int location, T const & v);
 

@@ -8,14 +8,14 @@
 we should think to reuse common code. */
 struct grid_of_terrains_lightdir_shader_program {
 	grid_of_terrains_lightdir_shader_program();
-	~grid_of_terrains_lightdir_shader_program();
 	void use() const;
 	void local_to_screen(glm::mat4 const & T);
 	void elevation_map(int texture_unit_id);  //!< Set elevation data as OpenGL texture.
 	void elevation_scale(float scale);
 	void height_scale(float scale);  // TODO: what is difference between elevation_sace and height_sacel?
 	void fill_color(glm::vec3 const & color);
-	GLint position_location() const;
+	[[nodiscard]] GLint position_location() const;
+	~grid_of_terrains_lightdir_shader_program();
 
 private:
 	GLuint _prog;  //!< OpenGL shader program ID.

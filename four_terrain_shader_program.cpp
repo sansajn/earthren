@@ -3,7 +3,7 @@
 #include <cassert>
 #include <glm/gtc/type_ptr.hpp>
 #include "four_terrain_shader_program.hpp"
-#include "io.hpp"
+#include "fs.hpp"
 #include "shader.hpp"
 #include "set_uniform.hpp"
 
