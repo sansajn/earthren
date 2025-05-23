@@ -6,8 +6,6 @@
 #include <GLES3/gl32.h>
 #include "shader.hpp"
 
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
-
 using std::cout, std::endl;
 
 constexpr GLuint WIDTH = 800,
@@ -74,7 +72,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(position_attr_id);
 
-	glVertexAttribPointer(color_attr_id, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(3*3*sizeof(GLfloat)));
+	glVertexAttribPointer(color_attr_id, 4, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void *>(3*3*sizeof(GLfloat)));
 	glEnableVertexAttribArray(color_attr_id);
 
 	glUseProgram(shader_program);

@@ -88,9 +88,14 @@ def build():
 
 	env.Program(['height_scale.cpp', height_scale_common, imgui])
 
+	# basic raw-opengl samples
+
 	# triangle sample
 	triangle_objs = ['shader.cpp']
 	env.Program(['triangle.cpp', triangle_objs])
+
+
+	# continue with terrain samples ...
 
 	# four terrain sample
 	env.Program(['four_terrain.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
