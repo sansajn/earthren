@@ -91,9 +91,11 @@ def build():
 	# basic raw-opengl samples
 
 	# triangle sample
-	triangle_objs = ['shader.cpp']
-	env.Program(['triangle.cpp', triangle_objs])
+	triangle_deps = ['shader.cpp']
+	env.Program(['triangle.cpp', triangle_deps])
 
+	# FBO render sample
+	env.Program(['fbo_render.cpp', triangle_deps])
 
 	# continue with terrain samples ...
 

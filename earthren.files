@@ -13,6 +13,7 @@ colors.glsl
 earthren.cxxflags
 earthren.files
 earthren.includes
+fbo_render.cpp
 flat_shader.cpp
 flat_shader.fs
 flat_shader.hpp
