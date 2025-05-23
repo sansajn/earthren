@@ -1,19 +1,23 @@
 /* Sample to draw triangle to NDC (Normalized Device Coordinate) space (-1,-1), (1,1), can serve as basic sample */
 #include <string>
-#include <cassert>
+#include <filesystem>
 #include <iostream>
+#include <cassert>
 #include <SDL.h>
 #include <GLES3/gl32.h>
 #include "shader.hpp"
 
 using std::cout, std::endl;
+using std::filesystem::path;
+using std::string;
+using namespace std::string_literals;
 
 constexpr GLuint WIDTH = 800,
 	HEIGHT = 600;
 
 char const * vs_src = R"(
 #version 320 es
-in vec3 position;  // we expect NDC (-1,-1), (1,1) rectangle
+in vec3 position;
 void main() {
 	gl_Position = vec4(position, 1.0f);
 })";
@@ -27,8 +31,11 @@ void main() {
 })";
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
+	// process arguments
+	string const title = string{path{argv[0]}.stem()} + " (OpenGL ES 3.2)"s;
+
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window* window = SDL_CreateWindow("OpenGL ES 3.2", SDL_WINDOWPOS_UNDEFINED,
+	SDL_Window * window = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
