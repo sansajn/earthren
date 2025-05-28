@@ -55,22 +55,6 @@ void main() {
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_mesh();
 
-GLuint create_texture(std::string const & fname) {
-	Magick::Image im{fname};
-	im.flip();
-	Magick::Blob imblob;
-	im.write(&imblob, "RGBA");  // load image as rgba array
-
-	GLuint tbo;
-	glGenTextures(1, &tbo);
-	glBindTexture(GL_TEXTURE_2D, tbo);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, im.columns(), im.rows());
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, im.columns(), im.rows(), GL_RGBA, GL_UNSIGNED_BYTE, imblob.data());
-	glBindTexture(GL_TEXTURE_2D, 0);  // unbint texture
-
-	return tbo;
-}
-
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	// process arguments
 	string const title = string{path{argv[0]}.stem()} + " (OpenGL ES 3.2)"s;
@@ -129,7 +113,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		GLuint const object_shader_program = get_shader_program(object_vs_src, object_fs_src);
 		assert(object_shader_program != 0);
 
-		// glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glViewport(0, 0, FBO_WIDTH, FBO_HEIGHT);
 
@@ -185,9 +168,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		auto [vao2, vbo2, ibo2, index_count2] = create_mesh();
 
-		std::string const texture_path = "lena.jpg";
-		GLuint const tbo = create_texture(texture_path);
-
 		// bind color_texture
 		// render texture
 		glUseProgram(texture_shader_program);
@@ -201,7 +181,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glUniform1i(s_loc, 0);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, color_texture);  // bind a texture to active texture unit (0)
-		// glBindTexture(GL_TEXTURE_2D, tbo);  // bind a texture to active texture unit (0)
 
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		glDrawElements(GL_TRIANGLES, index_count2, GL_UNSIGNED_INT, 0);
@@ -209,12 +188,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glBindVertexArray(0);  // unbind vao
 
-		glDeleteTextures(1, &tbo);
 		glDeleteBuffers(1, &vbo2);
 		glDeleteBuffers(1, &ibo2);
 		glDeleteVertexArrays(1, &vao2);
 		glDeleteProgram(texture_shader_program);
 	}  // render texture
+
+	glDeleteTextures(1, &color_texture);
 
 	while (true) {
 		SDL_Event event;
