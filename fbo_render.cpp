@@ -21,7 +21,7 @@ constexpr GLuint WIDTH = 800,
 
 char const * object_vs_src = R"(
 #version 320 es
-in vec3 position;
+layout(location = 0) in vec3 position;
 void main() {
 	gl_Position = vec4(position, 1.0f);
 })";
@@ -36,7 +36,7 @@ void main() {
 
 char const * texture_vs_src = R"(
 #version 320 es
-in vec3 position;  // we expect NDC rectangle ((-1,-1), (1,1))
+layout(location = 0) in vec3 position;  // we expect NDC rectangle ((-1,-1), (1,1))
 out vec2 st;
 void main() {
 	st = position.xy/2.0 + 0.5;
@@ -76,7 +76,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	GLuint color_texture;
 
-	{ // render into ramebuffer
+	{ // render into framebuffer
 		// create framebuffer object (FBO) and bind
 		GLuint fbo;
 		glGenFramebuffers(1, &fbo);
@@ -137,13 +137,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glBufferSubData(GL_ARRAY_BUFFER, 0, 3*3*sizeof(GLfloat), (GLvoid *)vertices);
 		glBufferSubData(GL_ARRAY_BUFFER, 3*3*sizeof(GLfloat), 3*4*sizeof(GLfloat), (GLvoid *)colors);
 
-		GLuint object_position_attr_id = 0, object_color_attr_id = 1;
+		GLuint object_position_attr_id = 0;  // see position attribute in shader program
 		glVertexAttribPointer(object_position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(object_position_attr_id);
-
-		// TODO: remove
-		glVertexAttribPointer(object_color_attr_id, 4, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void *>(3*3*sizeof(GLfloat)));
-		glEnableVertexAttribArray(object_color_attr_id);
 
 		glUseProgram(object_shader_program);
 
@@ -153,6 +149,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glBindVertexArray(0);  // unbind vao
 
+		glDeleteBuffers(1, &tribuf);
+		glDeleteVertexArrays(1, &vao);
 		glDeleteProgram(object_shader_program);
 	}  // render into framebuffer
 
@@ -166,13 +164,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glViewport(0, 0, WIDTH, HEIGHT);
 
-		auto [vao2, vbo2, ibo2, index_count2] = create_mesh();
+		auto [vao, vbo, ibo, index_count] = create_mesh();
 
 		// bind color_texture
 		// render texture
 		glUseProgram(texture_shader_program);
 
-		GLuint position_attr_id = 0;
+		GLuint position_attr_id = 0;  // see position attribute in shader program
 		glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(position_attr_id);
 
@@ -183,14 +181,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glBindTexture(GL_TEXTURE_2D, color_texture);  // bind a texture to active texture unit (0)
 
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-		glDrawElements(GL_TRIANGLES, index_count2, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
 		assert(glGetError() == GL_NO_ERROR && "opengl error");
 
 		glBindVertexArray(0);  // unbind vao
 
-		glDeleteBuffers(1, &vbo2);
-		glDeleteBuffers(1, &ibo2);
-		glDeleteVertexArrays(1, &vao2);
+		glDeleteBuffers(1, &vbo);
+		glDeleteBuffers(1, &ibo);
+		glDeleteVertexArrays(1, &vao);
 		glDeleteProgram(texture_shader_program);
 	}  // render texture
 
