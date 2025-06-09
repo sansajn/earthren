@@ -124,35 +124,47 @@ target_link_libraries(terrain_quad ${WITH_IMAGE})
 add_executable(satellite_map satellite_map.cpp camera.cpp free_camera.cpp texture.cpp shader.cpp tiff.cpp)
 target_link_libraries(satellite_map ${WITH_IMAGE})
 
+# basic raw-opengl samples
+
+# triangle sample
+add_executable(triangle triangle.cpp shader.cpp)
+target_link_libraries(triangle ${BASIC_COMMON_LIBRARIES})
+
+# FBO render samples
+add_executable(fbo_render fbo_render.cpp shader.cpp)
+target_link_libraries(fbo_render ${WITH_IMAGE})
+
+add_executable(reduce_shader reduce_shader.cpp shader.cpp)
+target_link_libraries(reduce_shader ${WITH_IMAGE})
+
 
 # ImGUI static library
 file(GLOB IMGUI_SRC
-    ${CMAKE_SOURCE_DIR}/imgui/*.cpp
-    ${CMAKE_SOURCE_DIR}/imgui/examples/imgui_impl_sdl.cpp
-    ${CMAKE_SOURCE_DIR}/imgui/examples/imgui_impl_opengl3.cpp
-)
+	${CMAKE_SOURCE_DIR}/imgui/*.cpp
+	${CMAKE_SOURCE_DIR}/imgui/examples/imgui_impl_sdl.cpp
+	${CMAKE_SOURCE_DIR}/imgui/examples/imgui_impl_opengl3.cpp)
+
 add_library(imgui STATIC ${IMGUI_SRC})
 target_include_directories(imgui PUBLIC
-    ${CMAKE_SOURCE_DIR}/imgui
-    ${CMAKE_SOURCE_DIR}/imgui/examples
-)
+	${CMAKE_SOURCE_DIR}/imgui
+	${CMAKE_SOURCE_DIR}/imgui/examples)
+
 target_include_directories(imgui PRIVATE ${SDL2_INCLUDE_DIRS})
 target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES3)
+
 # Suppress deprecated-enum-enum-conversion warnings for ImGUI
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(imgui PRIVATE -Wno-deprecated-enum-enum-conversion)
+	target_compile_options(imgui PRIVATE -Wno-deprecated-enum-enum-conversion)
 endif()
 
-# Common sources for height_scale
-set(HEIGHT_SCALE_COMMON
-    camera.cpp
-    free_camera.cpp
-    texture.cpp
-    shader.cpp
-    tiff.cpp
-    fs.cpp
-)
-
 # height_scale sample
-add_executable(height_scale height_scale.cpp ${HEIGHT_SCALE_COMMON})
+set(HEIGHT_SCALE_SOURCES
+	camera.cpp
+	free_camera.cpp
+	texture.cpp
+	shader.cpp
+	tiff.cpp
+	fs.cpp)
+
+add_executable(height_scale height_scale.cpp ${HEIGHT_SCALE_SOURCES})
 target_link_libraries(height_scale ${WITH_IMAGE} imgui)
