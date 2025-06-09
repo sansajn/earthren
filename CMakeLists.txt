@@ -20,30 +20,49 @@ include_directories(${CMAKE_SOURCE_DIR}/libs)  # TOTO: thre are more of include 
 # TODO: I want to specify a library versons there
 find_package(OpenGL REQUIRED)
 find_package(SDL2 REQUIRED)
-find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
 find_package(Boost REQUIRED)
 find_package(fmt REQUIRED)
+find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
 find_package(TIFF REQUIRED)
 
 
 # Samples
 
+set(BASIC_COMMON_LIBRARIES
+	${OPENGL_LIBRARIES} 
+	${SDL2_LIBRARIES}
+	${Boost_LIBRARIES}
+	fmt::fmt)
+
+set(IMAGE_COMMON_LIBRARIES
+	ImageMagick::Magick++
+	TIFF::TIFF 
+	TIFF::CXX)
+
 # xy_plane
 add_executable(xy_plane xy_plane.cpp)
-target_link_libraries(xy_plane ${OPENGL_LIBRARIES} ${SDL2_LIBRARIES} ${ImageMagick_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(xy_plane ${BASIC_COMMON_LIBRARIES})
 
 # xy_plane_panzoom
 add_executable(xy_plane_panzoom xy_plane_panzoom.cpp)
-target_link_libraries(xy_plane_panzoom ${OPENGL_LIBRARIES} ${SDL2_LIBRARIES} ${ImageMagick_LIBRARIES} ${Boost_LIBRARIES} fmt::fmt)
+target_link_libraries(xy_plane_panzoom ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
 
 # xy_plane_grid
 add_executable(xy_plane_grid xy_plane_grid.cpp)
-target_link_libraries(xy_plane_grid ${OPENGL_LIBRARIES} ${SDL2_LIBRARIES} ${ImageMagick_LIBRARIES} ${Boost_LIBRARIES} fmt::fmt)
+target_link_libraries(xy_plane_grid ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
 
 # texture_storage
 add_executable(texture_storage texture_storage.cpp)
-target_link_libraries(texture_storage ${OPENGL_LIBRARIES} ${SDL2_LIBRARIES} ${ImageMagick_LIBRARIES} ${Boost_LIBRARIES} fmt::fmt ImageMagick::Magick++)
+target_link_libraries(texture_storage ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
 
 # texture_storage_tiff
 add_executable(texture_storage_tiff texture_storage_tiff.cpp)
-target_link_libraries(texture_storage_tiff ${OPENGL_LIBRARIES} ${SDL2_LIBRARIES} ${ImageMagick_LIBRARIES} ${Boost_LIBRARIES} fmt::fmt ImageMagick::Magick++ TIFF::TIFF TIFF::CXX)
+target_link_libraries(texture_storage_tiff ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# xy_plane_texture
+add_executable(xy_plane_texture xy_plane_texture.cpp)
+target_link_libraries(xy_plane_texture ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# xy_plane_grid_textured
+add_executable(xy_plane_grid_textured xy_plane_grid_textured.cpp)
+target_link_libraries(xy_plane_grid_textured ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})

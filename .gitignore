@@ -12,6 +12,9 @@ learn/out
 
 script/out
 
+# build files e.g. from CMake
+build/
+
 # doxygen generated file (documentation)
 doxygen/
 
