@@ -39,6 +39,11 @@ set(IMAGE_COMMON_LIBRARIES
 	TIFF::TIFF 
 	TIFF::CXX)
 
+# WITH_IMAGE
+set(WITH_IMAGE
+	${BASIC_COMMON_LIBRARIES}
+	${IMAGE_COMMON_LIBRARIES})
+
 # xy_plane
 add_executable(xy_plane xy_plane.cpp)
 target_link_libraries(xy_plane ${BASIC_COMMON_LIBRARIES})
@@ -86,4 +91,23 @@ target_link_libraries(height_sinxy_map ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_
 # height_sinxy_normals
 add_executable(height_sinxy_normals height_sinxy_normals.cpp camera.cpp)
 target_link_libraries(height_sinxy_normals ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# height_sinxy_normals_fce
+add_executable(height_sinxy_normals_fce height_sinxy_normals_fce.cpp camera.cpp)
+target_link_libraries(height_sinxy_normals_fce ${WITH_IMAGE})
+
+# sinxy_heights
+add_executable(sinxy_heights sinxy_heights.cpp)
+target_link_libraries(sinxy_heights ${WITH_IMAGE})
+
+# height_map
+add_executable(height_map height_map.cpp camera.cpp free_camera.cpp)
+target_link_libraries(height_map ${WITH_IMAGE})
+
+#env.Program(['normals.cpp', 'camera.cpp'])
+#	env.Program(['geoms_plane.cpp', 'camera.cpp'])
+#	env.Program(['gs_triangle_broken.cpp', 'camera.cpp', 'free_camera.cpp'])
+#	env.Program(['terrain_quad.cpp', 'camera.cpp', 'free_camera.cpp'])
+#	env.Program(['satellite_map.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp', 'tiff.cpp'])
+
 
