@@ -168,3 +168,107 @@ set(HEIGHT_SCALE_SOURCES
 
 add_executable(height_scale height_scale.cpp ${HEIGHT_SCALE_SOURCES})
 target_link_libraries(height_scale ${WITH_IMAGE} imgui)
+
+
+
+# four_terrain sample
+add_executable(four_terrain
+    four_terrain.cpp
+    camera.cpp free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    flat_shader.cpp quad.cpp axis_model.cpp four_terrain_ui.cpp four_terrain_shader_program.cpp set_uniform.cpp
+)
+target_link_libraries(four_terrain ${WITH_IMAGE} imgui)
+
+# height_overlap sample
+add_executable(height_overlap
+    height_overlap.cpp
+    camera.cpp free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    flat_shader.cpp quad.cpp axis_model.cpp four_terrain_ui.cpp height_overlap_shader_program.cpp set_uniform.cpp
+)
+target_link_libraries(height_overlap ${WITH_IMAGE} imgui)
+
+# terrain_mesh sample
+add_executable(terrain_mesh
+    terrain_mesh.cpp
+    camera.cpp free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    flat_shader.cpp quad.cpp axis_model.cpp four_terrain_ui.cpp height_overlap_shader_program.cpp set_uniform.cpp
+)
+target_link_libraries(terrain_mesh ${WITH_IMAGE} imgui)
+
+# tile_grid sample
+add_executable(tile_grid tile_grid.cpp)
+target_link_libraries(tile_grid ${WITH_IMAGE})
+
+# terrain_scale sample
+add_executable(terrain_scale
+    terrain_scale.cpp
+    camera.cpp free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    flat_shader.cpp quad.cpp axis_model.cpp terrain_scale_ui.cpp height_overlap_shader_program.cpp set_uniform.cpp
+)
+target_link_libraries(terrain_scale ${WITH_IMAGE} imgui)
+
+# above_terrain sample
+add_executable(above_terrain
+    above_terrain.cpp
+    free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    flat_shader.cpp quad.cpp axis_model.cpp terrain_scale_ui.cpp height_overlap_shader_program.cpp
+    above_terrain_outline_shader_program.cpp set_uniform.cpp
+)
+target_link_libraries(above_terrain ${WITH_IMAGE} imgui)
+
+# generate_dump sample
+add_executable(generate_dump generate_dump.cpp)
+target_link_libraries(generate_dump ${BASIC_COMMON_LIBRARIES})
+
+# grid_of_terrains sample
+add_executable(grid_of_terrains
+    grid_of_terrains.cpp
+    free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    axis_model.cpp flat_shader.cpp terrain_scale_ui.cpp height_overlap_shader_program.cpp
+    above_terrain_outline_shader_program.cpp set_uniform.cpp
+    quad.cpp grid_of_terrains_lightdir_shader_program.cpp terrain_grid.cpp terrain_camera.cpp
+)
+target_link_libraries(grid_of_terrains ${WITH_IMAGE} imgui)
+
+# more_details sample
+add_executable(more_details
+    more_details.cpp
+    more_details_terrain_grid.cpp
+    free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    axis_model.cpp flat_shader.cpp terrain_scale_ui.cpp height_overlap_shader_program.cpp
+    above_terrain_outline_shader_program.cpp set_uniform.cpp
+    quad.cpp grid_of_terrains_lightdir_shader_program.cpp terrain_camera.cpp
+)
+target_link_libraries(more_details ${WITH_IMAGE} imgui)
+
+# lod_tiles sample
+add_executable(lod_tiles
+    lod_tiles.cpp
+    lod_tiles_terrain_grid.cpp
+    lod_tiles_user_input.cpp
+    lod_tiles_draw_terrain.cpp
+    free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    axis_model.cpp flat_shader.cpp terrain_scale_ui.cpp height_overlap_shader_program.cpp
+    above_terrain_outline_shader_program.cpp set_uniform.cpp
+    quad.cpp grid_of_terrains_lightdir_shader_program.cpp terrain_camera.cpp
+)
+target_link_libraries(lod_tiles ${WITH_IMAGE} imgui)
+
+# Add ogl static library
+file(GLOB OGL_SRC ${CMAKE_SOURCE_DIR}/libs/ogl/*.cpp)
+add_library(ogl STATIC ${OGL_SRC})
+target_include_directories(ogl PUBLIC ${CMAKE_SOURCE_DIR}/libs/ogl)
+
+# lod_camera sample
+add_executable(lod_camera
+    lod_camera.cpp
+    lod_camera_terrain_grid.cpp
+    lod_tiles_user_input.cpp
+    lod_camera_draw_terrain.cpp
+    shape.cpp shape_mesh.cpp shade_shader.cpp mesh_draw.cpp
+    free_camera.cpp texture.cpp shader.cpp tiff.cpp fs.cpp
+    axis_model.cpp flat_shader.cpp terrain_scale_ui.cpp height_overlap_shader_program.cpp
+    above_terrain_outline_shader_program.cpp set_uniform.cpp
+    quad.cpp grid_of_terrains_lightdir_shader_program.cpp terrain_camera.cpp
+)
+target_link_libraries(lod_camera ${WITH_IMAGE} imgui ogl)
