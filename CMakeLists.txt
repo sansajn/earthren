@@ -20,9 +20,9 @@ include_directories(${CMAKE_SOURCE_DIR}/libs)  # TOTO: thre are more of include 
 # TODO: I want to specify a library versons there
 find_package(OpenGL REQUIRED)
 find_package(SDL2 REQUIRED)
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 find_package(fmt REQUIRED)
-find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
+find_package(ImageMagick REQUIRED COMPONENTS Magick++)
 find_package(TIFF REQUIRED)
 
 
@@ -31,7 +31,7 @@ find_package(TIFF REQUIRED)
 set(BASIC_COMMON_LIBRARIES
 	${OPENGL_LIBRARIES} 
 	${SDL2_LIBRARIES}
-	${Boost_LIBRARIES}
+	Boost::filesystem
 	fmt::fmt)
 
 set(IMAGE_COMMON_LIBRARIES
@@ -66,3 +66,24 @@ target_link_libraries(xy_plane_texture ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_
 # xy_plane_grid_textured
 add_executable(xy_plane_grid_textured xy_plane_grid_textured.cpp)
 target_link_libraries(xy_plane_grid_textured ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# map_camera
+add_executable(map_camera map_camera.cpp)
+target_link_libraries(map_camera ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# height_sinxy
+add_executable(height_sinxy height_sinxy.cpp)
+target_link_libraries(height_sinxy ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# plot_sinxy
+add_executable(plot_sinxy plot_sinxy.cpp)
+target_link_libraries(plot_sinxy ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# height_sinxy_map
+add_executable(height_sinxy_map height_sinxy_map.cpp)
+target_link_libraries(height_sinxy_map ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
+# height_sinxy_normals
+add_executable(height_sinxy_normals height_sinxy_normals.cpp camera.cpp)
+target_link_libraries(height_sinxy_normals ${BASIC_COMMON_LIBRARIES} ${IMAGE_COMMON_LIBRARIES})
+
