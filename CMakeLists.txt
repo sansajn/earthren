@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(MyProject)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # TODO: how to trigger debug-build? What build is the default one debug or release?
 # Compiler flags
@@ -17,7 +17,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 include_directories(${CMAKE_SOURCE_DIR}/libs)  # TOTO: thre are more of include directories
 
 
-# TODO: I want to specify a library versons there
+# TODO: I want to specify a library versons as well there
 find_package(OpenGL REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem)
@@ -104,10 +104,55 @@ target_link_libraries(sinxy_heights ${WITH_IMAGE})
 add_executable(height_map height_map.cpp camera.cpp free_camera.cpp)
 target_link_libraries(height_map ${WITH_IMAGE})
 
-#env.Program(['normals.cpp', 'camera.cpp'])
-#	env.Program(['geoms_plane.cpp', 'camera.cpp'])
-#	env.Program(['gs_triangle_broken.cpp', 'camera.cpp', 'free_camera.cpp'])
-#	env.Program(['terrain_quad.cpp', 'camera.cpp', 'free_camera.cpp'])
-#	env.Program(['satellite_map.cpp', 'camera.cpp', 'free_camera.cpp', 'texture.cpp', 'shader.cpp', 'tiff.cpp'])
+# normals
+add_executable(normals normals.cpp camera.cpp)
+target_link_libraries(normals ${WITH_IMAGE})
+
+# geoms_plane
+add_executable(geoms_plane geoms_plane.cpp camera.cpp)
+target_link_libraries(geoms_plane ${WITH_IMAGE})
+
+# gs_triangle_broken
+add_executable(gs_triangle_broken gs_triangle_broken.cpp camera.cpp free_camera.cpp)
+target_link_libraries(gs_triangle_broken ${BASIC_COMMON_LIBRARIES})
+
+# terrain_quad
+add_executable(terrain_quad terrain_quad.cpp camera.cpp free_camera.cpp)
+target_link_libraries(terrain_quad ${WITH_IMAGE})
+
+# satellite_map
+add_executable(satellite_map satellite_map.cpp camera.cpp free_camera.cpp texture.cpp shader.cpp tiff.cpp)
+target_link_libraries(satellite_map ${WITH_IMAGE})
 
 
+# ImGUI static library
+file(GLOB IMGUI_SRC
+    ${CMAKE_SOURCE_DIR}/imgui/*.cpp
+    ${CMAKE_SOURCE_DIR}/imgui/examples/imgui_impl_sdl.cpp
+    ${CMAKE_SOURCE_DIR}/imgui/examples/imgui_impl_opengl3.cpp
+)
+add_library(imgui STATIC ${IMGUI_SRC})
+target_include_directories(imgui PUBLIC
+    ${CMAKE_SOURCE_DIR}/imgui
+    ${CMAKE_SOURCE_DIR}/imgui/examples
+)
+target_include_directories(imgui PRIVATE ${SDL2_INCLUDE_DIRS})
+target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES3)
+# Suppress deprecated-enum-enum-conversion warnings for ImGUI
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(imgui PRIVATE -Wno-deprecated-enum-enum-conversion)
+endif()
+
+# Common sources for height_scale
+set(HEIGHT_SCALE_COMMON
+    camera.cpp
+    free_camera.cpp
+    texture.cpp
+    shader.cpp
+    tiff.cpp
+    fs.cpp
+)
+
+# height_scale sample
+add_executable(height_scale height_scale.cpp ${HEIGHT_SCALE_COMMON})
+target_link_libraries(height_scale ${WITH_IMAGE} imgui)
