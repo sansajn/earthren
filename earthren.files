@@ -275,6 +275,7 @@ qtree_traverse.hpp
 quad.cpp
 quad.hpp
 readme.md
+reduce_shader.cpp
 satellite_map.cpp
 set_uniform.cpp
 set_uniform.hpp

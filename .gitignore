@@ -64,6 +64,8 @@ generate_dump
 simple_shading
 triangle
 fbo_render
+reduce_shader
+
 
 ogl_buffer
 ogl_mesh

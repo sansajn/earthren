@@ -96,6 +96,7 @@ def build():
 
 	# FBO render sample
 	env.Program(['fbo_render.cpp', triangle_deps])
+	env.Program(['reduce_shader.cpp', triangle_deps])
 
 	# continue with terrain samples ...
 
@@ -117,7 +118,7 @@ def build():
 	# tile_grid
 	env.Program(['tile_grid.cpp'])
 
-	# terrain mesh sample
+	# terrain scale sample
 	env.Program(['terrain_scale.cpp', height_scale_common, 'flat_shader.cpp', 'quad.cpp',
 		'axis_model.cpp', 'terrain_scale_ui.cpp', 'height_overlap_shader_program.cpp',
 		'set_uniform.cpp', imgui])
