@@ -336,28 +336,6 @@ int main(int argc, char * argv[]) {
 		save_image_rgba(pixels, currentWidth/2, currentHeight/2, "reduction_1.png");
 	}
 
-
-	
-
-
-	{  // render texture to window framebuffer
-
-		auto [vao, vbo, ibo, index_count] = create_mesh();
-
-		GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
-		assert(texture_shader_program != 0);
-
-		draw_texture(vao, index_count, WIDTH, HEIGHT, inputTexture, texture_shader_program);
-
-		glDeleteBuffers(1, &vbo);
-		glDeleteBuffers(1, &ibo);
-		glDeleteVertexArrays(1, &vao);
-		glDeleteProgram(texture_shader_program);
-	}  // render texture
-
-
-
-
 /*	
 	// Update dimensions
 	currentWidth /= 2;
@@ -419,14 +397,25 @@ int main(int argc, char * argv[]) {
 
 */
 
+	// mesh for drawing texture
+	auto [tmesh_vao, tmesh_vbo, tmesh_ibo, tmesh_index_count] = create_mesh();
+
+	// program for drawing texture
+	GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
+		assert(texture_shader_program != 0);
+
 	while (true) {
 		SDL_Event event;
 		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
 			break;
 
+		GLuint rendered_texture = inputTexture;
 
+		if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
+			cout << "prepare new texture to render" << endl;
+		}
 
-
+		draw_texture(tmesh_vao, tmesh_index_count, WIDTH, HEIGHT, rendered_texture, texture_shader_program);
 
 		SDL_GL_SwapWindow(window);
 	}
@@ -434,6 +423,13 @@ int main(int argc, char * argv[]) {
 	// Restore previous OpenGL state
 	// glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+	glDeleteBuffers(1, &tmesh_vbo);
+	glDeleteBuffers(1, &tmesh_ibo);
+	glDeleteVertexArrays(1, &tmesh_vao);
+	glDeleteProgram(texture_shader_program);
+
+
 
 	glDeleteVertexArrays(1, &quadVAO);
 	glDeleteFramebuffers(1, &fboA);
@@ -453,6 +449,8 @@ int main(int argc, char * argv[]) {
 // switch to window framebuffer and render texture
 void draw_texture(GLuint vao, unsigned int index_count, GLuint width, 
 	GLuint height, GLuint tid, GLuint texture_prog) {
+	
+	glBindVertexArray(vao);
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);  // return to the default FB
 
