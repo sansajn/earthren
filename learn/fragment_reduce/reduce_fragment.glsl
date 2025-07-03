@@ -25,5 +25,10 @@ void main() {
 	vec4 value4 = texture(inputTexture, texCoordSE);
 	
 	// Perform reduction operation
-	resultValue = max(max(max(value1, value2), value3), value4);
+	//resultValue = max(max(max(value1, value2), value3), value4);
+
+	resultValue.x = max(value1.x, max(value2.x, max(value3.x, value4.x)));
+	resultValue.y = max(value1.y, max(value2.y, max(value3.y, value4.y)));
+	resultValue.z = max(value1.z, max(value2.z, max(value3.z, value4.z)));
+	resultValue.w = max(value1.w, max(value2.w, max(value3.w, value4.w)));
 }

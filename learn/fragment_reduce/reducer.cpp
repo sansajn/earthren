@@ -25,11 +25,24 @@ void drawQuad(GLuint quadVAO) {
 	glBindVertexArray(0);
 }
 
-// Create a texture filled with test data
-GLuint createDataTexture(int width, int height) {
-	GLuint texture;
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
+// Simple structure to hold texture and maximum values
+struct TextureData {
+    GLuint textureId;     // OpenGL texture ID
+    float maxValues[4];   // Maximum value for each channel (R,G,B,A)
+};
+
+// Create a texture with deterministic test data and track maximum values.
+TextureData createDataTexture(int width, int height) {
+	TextureData result;
+	
+	// Initialize max values to minimum possible float
+	for (int i = 0; i < 4; i++) {
+		result.maxValues[i] = -std::numeric_limits<float>::max();
+	}
+	
+	// Generate texture ID
+	glGenTextures(1, &result.textureId);
+	glBindTexture(GL_TEXTURE_2D, result.textureId);
 	
 	// Set texture parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -42,23 +55,62 @@ GLuint createDataTexture(int width, int height) {
 	
 	// Generate test data on CPU
 	std::vector<float> data(width * height * 4);
+	
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			int index = (y * width + x) * 4;
-			// Example pattern: gradient values
-			data[index + 0] = static_cast<float>(x) / width;        // R: horizontal gradient
-			data[index + 1] = static_cast<float>(y) / height;       // G: vertical gradient
-			data[index + 2] = static_cast<float>(x + y) / (width + height); // B: diagonal gradient
-			data[index + 3] = 1.0f;                                // A: constant 1.0
+			
+			// R: horizontal gradient (0 to 100)
+			float r = static_cast<float>(x) / (width - 1) * 100.0f;
+			data[index + 0] = r;
+			result.maxValues[0] = std::max(result.maxValues[0], r);
+			
+			// G: vertical gradient (0 to 100)
+			float g = static_cast<float>(y) / (height - 1) * 100.0f;
+			data[index + 1] = g;
+			result.maxValues[1] = std::max(result.maxValues[1], g);
+			
+			// B: checkerboard pattern (0 or 50)
+			float b = ((x + y) % 2 == 0) ? 50.0f : 0.0f;
+			data[index + 2] = b;
+			result.maxValues[2] = std::max(result.maxValues[2], b);
+			
+			// A: constant 1.0
+			data[index + 3] = 1.0f;
+			result.maxValues[3] = 1.0f;
 		}
+	}
+	
+	// Add a few specific high values to test max reduction
+	if (width >= 10 && height >= 10) {
+		// Set a specific maximum value for red at position (3,7)
+		int specialIndex = (7 * width + 3) * 4;
+		data[specialIndex + 0] = 150.0f;  // Higher than any other red value
+		result.maxValues[0] = 150.0f;
+		
+		// Set a specific maximum value for green at position (8,2)
+		specialIndex = (2 * width + 8) * 4;
+		data[specialIndex + 1] = 175.0f;  // Higher than any other green value
+		result.maxValues[1] = 175.0f;
+		
+		// Set a specific maximum value for blue at position (5,5)
+		specialIndex = (5 * width + 5) * 4;
+		data[specialIndex + 2] = 225.0f;  // Higher than any other blue value
+		result.maxValues[2] = 225.0f;
 	}
 	
 	// Upload data to the texture
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_FLOAT, data.data());
 	
-	return texture;
+	// Print maximum values for reference
+	printf("Texture Maximum Values:\n");
+	printf("  Red:   %.2f\n", result.maxValues[0]);
+	printf("  Green: %.2f\n", result.maxValues[1]);
+	printf("  Blue:  %.2f\n", result.maxValues[2]);
+	printf("  Alpha: %.2f\n", result.maxValues[3]);
+	
+	return result;
 }
-
 
 int main(int argc, char * argv[]) {
 	// process arguments
@@ -165,8 +217,9 @@ int main(int argc, char * argv[]) {
 
 	// create input data texture
 
-	GLuint inputTexture = createDataTexture(initialWidth, initialHeight);  // GL_RGBA with GL_RGBA32F
-	// Q: What is maximum value?
+	TextureData tex = createDataTexture(initialWidth, initialHeight);  // GL_RGBA with GL_RGBA32F
+	GLuint inputTexture = tex.textureId;
+	 // Q: What is maximum value?
 
 	// reduce
 
