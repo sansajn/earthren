@@ -19,8 +19,8 @@ using std::string, std::tuple;
 using std::vector;
 using namespace std::string_literals;
 
-constexpr GLuint WIDTH = 800,
-	HEIGHT = 800;
+constexpr GLuint WIDTH = 512,
+	HEIGHT = 512;
 
 // Shader programs to render texture into FBO.
 char const * texture_vs_src = R"(
@@ -368,12 +368,13 @@ int main(int argc, char * argv[]) {
 			GLuint reduced_texture_id = reduce_texture_half(rendered_texture, 
 				current_width, current_height, reduce_shader_program, quad_vao);
 			
-			{  // save for debugging
-				GLuint const w = current_width/2, 
-					h = current_height/2;
-				vector<float> const pixels = read_back_rgba32f(reduced_texture_id, w, h);
-				save_image_rgba(pixels, w, h, std::format("reduction_{}.png", reduce_level));
-			}
+			// save for debugging
+			GLuint const w = current_width/2, 
+				h = current_height/2;
+			vector<float> const pixels = read_back_rgba32f(reduced_texture_id, w, h);
+			save_image_rgba(pixels, w, h, std::format("reduction_{}.png", reduce_level));
+
+			cout << "texture reduced to (" << w << "x" << h << "), level= " << reduce_level << endl;
 
 			if (rendered_texture != inputTexture)
 				glDeleteTextures(1, &rendered_texture);
@@ -381,9 +382,6 @@ int main(int argc, char * argv[]) {
 			rendered_texture = reduced_texture_id;
 			current_width /= 2;
 			current_height /= 2;
-			
-			cout << "texture reduce level " << reduce_level << endl;
-
 			reduce_level += 1;
 		}
 
