@@ -34,6 +34,7 @@ void main() {
 	frag_color = vec4(1,0,0,1);  // red
 })";
 
+// Shader programs to render texture into FBO.
 char const * texture_vs_src = R"(
 #version 320 es
 layout(location = 0) in vec3 position;  // we expect NDC rectangle ((-1,-1), (1,1))
@@ -210,6 +211,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 }
 
 tuple<GLuint, GLuint, GLuint, unsigned> create_mesh() {
+	// GL_TRIANGLES
 	constexpr GLfloat vertices[] = {
 		-1, -1, 0,
 		 1, -1, 0,

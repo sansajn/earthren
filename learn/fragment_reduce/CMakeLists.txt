@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(SDL2 REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
 
 add_executable(reducer
 	reducer.cpp
@@ -25,6 +26,7 @@ target_link_libraries(reducer
 	GLESv2
 	fmt
 	stdc++fs
+	ImageMagick::Magick++
 )
 
 # Optionally, if you use pkg-config for SDL2:

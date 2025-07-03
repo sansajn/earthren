@@ -1,21 +1,75 @@
 // Sample for reduce fragment shader for OpenGL 3.2 ES.
 #include <string>
 #include <tuple>
+#include <vector>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <cassert>
 #include <SDL.h>
 #include <GLES3/gl32.h>
+#include <Magick++.h>
 #include "shader.hpp"
 #include "fs.hpp"
 
 using std::cout, std::endl;
 using std::filesystem::path;
 using std::string, std::tuple;
+using std::vector;
 using namespace std::string_literals;
 
 constexpr GLuint WIDTH = 800,
-	HEIGHT = 600;
+	HEIGHT = 800;
+
+// Shader programs to render texture into FBO.
+char const * texture_vs_src = R"(
+#version 320 es
+layout(location = 0) in vec3 position;  // we expect NDC rectangle ((-1,-1), (1,1))
+out vec2 st;
+void main() {
+	st = position.xy/2.0 + 0.5;
+	gl_Position = vec4(position, 1.0f);
+})";
+
+char const * texture_fs_src = R"(
+#version 320 es
+precision mediump float;
+uniform sampler2D s;
+in vec2 st;
+out vec4 frag_color;
+void main() {
+	frag_color = texture(s, st);
+})";
+
+tuple<GLuint, GLuint, GLuint, unsigned> create_mesh() {
+	constexpr GLfloat vertices[] = {
+		-1, -1, 0,
+		 1, -1, 0,
+		 1,  1, 0,
+		-1,  1, 0};
+
+	constexpr GLuint indices[] = {
+		0, 1, 2,  2, 3, 0
+	};
+
+	unsigned index_count = sizeof(indices)/sizeof(GLuint);
+
+	GLuint vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, 4*3*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+
+	GLuint ibo;
+	glGenBuffers(1, &ibo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6*sizeof(GLuint), indices, GL_STATIC_DRAW);
+
+	return {vao, vbo, ibo, index_count};
+}
 
 
 // Function to draw the quad
@@ -27,8 +81,9 @@ void drawQuad(GLuint quadVAO) {
 
 // Simple structure to hold texture and maximum values
 struct TextureData {
-    GLuint textureId;     // OpenGL texture ID
-    float maxValues[4];   // Maximum value for each channel (R,G,B,A)
+	GLuint textureId;     // OpenGL texture ID
+	float maxValues[4];   // Maximum value for each channel (R,G,B,A)
+	vector<float> data;  // pixel data in texture (RGBA) format
 };
 
 // Create a texture with deterministic test data and track maximum values.
@@ -39,6 +94,8 @@ TextureData createDataTexture(int width, int height) {
 	for (int i = 0; i < 4; i++) {
 		result.maxValues[i] = -std::numeric_limits<float>::max();
 	}
+
+	// create RGBA-32F texture to store 4 float values per pixel there
 	
 	// Generate texture ID
 	glGenTextures(1, &result.textureId);
@@ -54,24 +111,25 @@ TextureData createDataTexture(int width, int height) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 	
 	// Generate test data on CPU
-	std::vector<float> data(width * height * 4);
+	vector<float> & data = result.data;
+	data.resize(width * height * 4);
 	
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			int index = (y * width + x) * 4;
 			
 			// R: horizontal gradient (0 to 100)
-			float r = static_cast<float>(x) / (width - 1) * 100.0f;
+			float const r = 0.0f;  //static_cast<float>(x) / (width - 1);
 			data[index + 0] = r;
 			result.maxValues[0] = std::max(result.maxValues[0], r);
 			
 			// G: vertical gradient (0 to 100)
-			float g = static_cast<float>(y) / (height - 1) * 100.0f;
+			float const g = 0.0f;  //static_cast<float>(y) / (height - 1);
 			data[index + 1] = g;
 			result.maxValues[1] = std::max(result.maxValues[1], g);
 			
 			// B: checkerboard pattern (0 or 50)
-			float b = ((x + y) % 2 == 0) ? 50.0f : 0.0f;
+			float const b = ((x + y) % 2 == 0) ? 0.5f : 0.0f;
 			data[index + 2] = b;
 			result.maxValues[2] = std::max(result.maxValues[2], b);
 			
@@ -80,23 +138,26 @@ TextureData createDataTexture(int width, int height) {
 			result.maxValues[3] = 1.0f;
 		}
 	}
-	
+
 	// Add a few specific high values to test max reduction
 	if (width >= 10 && height >= 10) {
 		// Set a specific maximum value for red at position (3,7)
+		float const magick_r = 0.5f;
 		int specialIndex = (7 * width + 3) * 4;
-		data[specialIndex + 0] = 150.0f;  // Higher than any other red value
-		result.maxValues[0] = 150.0f;
+		data[specialIndex + 0] = magick_r;  // Higher than any other red value
+		result.maxValues[0] = magick_r;
 		
 		// Set a specific maximum value for green at position (8,2)
+		float const magick_g = 0.75f;
 		specialIndex = (2 * width + 8) * 4;
-		data[specialIndex + 1] = 175.0f;  // Higher than any other green value
-		result.maxValues[1] = 175.0f;
+		data[specialIndex + 1] = magick_g;  // Higher than any other green value
+		result.maxValues[1] = magick_g;
 		
 		// Set a specific maximum value for blue at position (5,5)
+		float const magick_b = 0.6f;
 		specialIndex = (5 * width + 5) * 4;
-		data[specialIndex + 2] = 225.0f;  // Higher than any other blue value
-		result.maxValues[2] = 225.0f;
+		data[specialIndex + 2] = magick_b;  // Higher than any other blue value
+		result.maxValues[2] = magick_b;
 	}
 	
 	// Upload data to the texture
@@ -112,8 +173,24 @@ TextureData createDataTexture(int width, int height) {
 	return result;
 }
 
+vector<float> read_back(GLuint fbo, int width, int height) {
+	assert(width >= 1 && height >= 1 && "Width and height must be at least 1");
+	
+	vector<float> pixels(width * height * 4);  // RGBA format
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, pixels.data());
+
+	return pixels;
+}
+
+void save_texture_as_png(GLuint textureID, std::string const & filename);
+
+void save_image_rgba(vector<float> const & pixels_rgba, size_t w, size_t h, string const & fname);
+
 int main(int argc, char * argv[]) {
 	// process arguments
+	Magick::InitializeMagick(*argv);
+	
 	string const title = string{path{argv[0]}.stem()} + " (OpenGL ES 3.2)"s;
 
 	SDL_Init(SDL_INIT_VIDEO);
@@ -140,8 +217,6 @@ int main(int argc, char * argv[]) {
 
 	GLuint const reduce_shader_program = get_shader_program(vs_src.c_str(), fs_src.c_str());
 	assert(reduce_shader_program != 0);
-
-
 
 	// Vertex data for a full-screen quad (positions only)
 	const float quadVertices[] = {
@@ -214,12 +289,11 @@ int main(int argc, char * argv[]) {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-
 	// create input data texture
-
 	TextureData tex = createDataTexture(initialWidth, initialHeight);  // GL_RGBA with GL_RGBA32F
 	GLuint inputTexture = tex.textureId;
-	 // Q: What is maximum value?
+
+	save_image_rgba(tex.data, initialWidth, initialHeight, "reduction_0.png");
 
 	// reduce
 
@@ -241,13 +315,67 @@ int main(int argc, char * argv[]) {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, inputTexture);
 	glUniform1i(glGetUniformLocation(reduce_shader_program, "inputTexture"), 0);
-	glUniform2f(glGetUniformLocation(reduce_shader_program, "texelSize"), 
-				1.0f / static_cast<float>(currentWidth), 
-				1.0f / static_cast<float>(currentHeight));
+	
+	{
+		float const w_texel_size = 1.0f / static_cast<float>(currentWidth/2),  // TODO: copilot adviced 1/currentWidth
+			h_texel_size = 1.0f / static_cast<float>(currentHeight/2);
+		
+		glUniform2f(glGetUniformLocation(reduce_shader_program, "texelSize"), 
+						w_texel_size, h_texel_size);
+		cout << "Texel size: (" << w_texel_size << ", " << h_texel_size << ")\n";
+	}
 
 	// Draw full-screen quad
 	drawQuad(quadVAO);
 
+	{
+		vector<float> const pixels = read_back(fboA, currentWidth/2, currentHeight/2);
+		save_image_rgba(pixels, currentWidth/2, currentHeight/2, "reduction_1.png");
+	}
+
+
+	{  // render texture to window framebuffer
+		// switch to window framebuffer and render texture
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);  // return to the default FB
+
+		GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
+		assert(texture_shader_program != 0);
+
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glViewport(0, 0, WIDTH, HEIGHT);
+
+		auto [vao, vbo, ibo, index_count] = create_mesh();
+
+		// bind color_texture
+		// render texture
+		glUseProgram(texture_shader_program);
+
+		GLuint position_attr_id = 0;  // see position attribute in shader program
+		glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(position_attr_id);
+
+		GLint s_loc = glGetUniformLocation(texture_shader_program, "s");
+		assert(s_loc != -1 && "unknown uniform");
+		glUniform1i(s_loc, 0);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, inputTexture);  // bind a texture to active texture unit (0)
+
+		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
+		assert(glGetError() == GL_NO_ERROR && "opengl error");
+
+		glBindVertexArray(0);  // unbind vao
+
+		glDeleteBuffers(1, &vbo);
+		glDeleteBuffers(1, &ibo);
+		glDeleteVertexArrays(1, &vao);
+		glDeleteProgram(texture_shader_program);
+	}  // render texture
+
+
+
+
+/*	
 	// Update dimensions
 	currentWidth /= 2;
 	currentHeight /= 2;
@@ -257,6 +385,7 @@ int main(int argc, char * argv[]) {
 	GLuint currentFBO = fboB;
 	GLuint currentOutputTexture = textureB;
 
+	int reduce_iteration = 1;
 	while (currentWidth > 1 || currentHeight > 1) {
 		// Bind output FBO
 		glBindFramebuffer(GL_FRAMEBUFFER, currentFBO);
@@ -265,47 +394,59 @@ int main(int argc, char * argv[]) {
 		// Set input texture and uniforms
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, currentInputTexture);
-		glUniform1i(glGetUniformLocation(reduce_shader_program, "inputTexture"), 0);
-		glUniform2f(glGetUniformLocation(reduce_shader_program, "texelSize"), 
-						1.0f / static_cast<float>(currentWidth), 
-						1.0f / static_cast<float>(currentHeight));
+		glUniform1i(glGetUniformLocation(reduce_shader_program, "inputTexture"), 0);  // 0 is texture-unit index, in our case 0 (GL_TEXTURE0 from glActivateTexture call)
 		
-		// Draw full-screen quad
-		glBindVertexArray(quadVAO);
-		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		{
+			float const w_texel_size = 1.0f / static_cast<float>(currentWidth/2),  // TODO: copilot adviced 1/currentWidth
+				h_texel_size = 1.0f / static_cast<float>(currentHeight/2);
+			
+			glUniform2f(glGetUniformLocation(reduce_shader_program, "texelSize"), 
+							w_texel_size, h_texel_size);
+			cout << "Texel size: (" << w_texel_size << ", " << h_texel_size << ")\n";
+		}
 		
+		drawQuad(quadVAO);
+		
+		if (reduce_iteration == 2) {
+			vector<float> const pixels = read_back(currentFBO, currentWidth/2, currentHeight/2);
+			save_image_rgba(pixels, currentWidth/2, currentHeight/2, "reduction_2.png");
+		}
+
 		// Swap input and output for next pass
 		currentInputTexture = currentOutputTexture;
 		currentFBO = (currentFBO == fboA) ? fboB : fboA;
 		currentOutputTexture = (currentOutputTexture == textureA) ? textureB : textureA;
-		
+
+		cout << "Reduction iteration: " << reduce_iteration 
+			<< ", (width=)" << currentWidth << ", (height=)" << currentHeight
+			<< '\n';
+
 		// Update dimensions
 		currentWidth = std::max(1, currentWidth/2);
 		currentHeight = std::max(1, currentHeight/2);
+		
+		reduce_iteration += 1;
 	}
 
+	// TODO: make a funciton to read back texture data from bellow code
 
-	// Read back final result (1x1 texture)
-	float result[4];
-	glBindFramebuffer(GL_FRAMEBUFFER, currentFBO == fboA ? fboB : fboA);
-	glReadPixels(0, 0, 1, 1, GL_RGBA, GL_FLOAT, result);
-	
-	// Restore previous OpenGL state
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-	// while (true) {
-	// 	SDL_Event event;
-	// 	if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
-	// 		break;
-
-	// 	drawQuad(quadVAO);  // render quad there
-
-	// 	SDL_GL_SwapWindow(window);
-	// }
-
+	vector<float> result = read_back(currentFBO == fboA ? fboB : fboA, 1, 1);
 	cout << "Reduction result: (" << result[0] << ", " << result[1] << ", "
 		<< result[2] << ", " << result[3] << ")" << endl;
+
+*/
+
+	while (true) {
+		SDL_Event event;
+		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
+			break;
+
+		SDL_GL_SwapWindow(window);
+	}
+
+	// Restore previous OpenGL state
+	// glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 
 	glDeleteVertexArrays(1, &quadVAO);
 	glDeleteFramebuffers(1, &fboA);
@@ -319,4 +460,56 @@ int main(int argc, char * argv[]) {
 	SDL_Quit();
 
 	return 0;
+}
+
+
+void save_image_rgba(vector<float> const & pixels_rgba, size_t w, size_t h, string const & fname) {
+	Magick::Image im;
+	im.read(w, h, "RGBA", Magick::StorageType::FloatPixel, pixels_rgba.data());
+	im.write(fname);
+}
+
+// TODO: we should remove textureID,  it is misslieading, because we are reading from FBO, not texture
+// Reads from the current FBO and saves texture as PNG file
+void save_texture_as_png(GLuint textureID, std::string const & filename) {
+	// 1) Bind the texture
+	glBindTexture(GL_TEXTURE_2D, textureID);
+
+	// 2) Query its dimensions
+	GLint width=0, height=0;
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &width);
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+	if(width <= 0 || height <= 0) {
+		throw std::runtime_error("Texture has invalid dimensions");
+	}
+
+	// 3) Read back as floats
+	vector<float> floatData(width * height * 4);
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, floatData.data());
+
+	// 4) Convert floats to bytes [0..255]
+	vector<unsigned char> byteData(width * height * 4);
+	for(size_t i = 0; i < floatData.size(); ++i) {
+		float c = std::min(1.0f, std::max(0.0f, floatData[i]));
+		byteData[i] = static_cast<unsigned char>(c * 255.0f);
+	}
+
+	// 5) Flip vertically
+	vector<unsigned char> flipped(width * height * 4);
+	for(int y = 0; y < height; ++y) {
+		const unsigned char* srcRow = &byteData[(height - 1 - y) * width * 4];
+		unsigned char*       dstRow = &flipped[ y                * width * 4];
+		memcpy(dstRow, srcRow, width * 4);
+	}
+
+	// 6) Create Magick::Image from raw RGBA bytes
+	Magick::Image image(
+		width, height,
+		"RGBA"s,                 // pixel order
+		Magick::CharPixel,      // each channel is an unsigned char
+		flipped.data()          // pointer to your pixel buffer
+	);
+
+	// 7) Write out as PNG
+	image.write(filename);
 }
