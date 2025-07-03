@@ -41,43 +41,11 @@ void main() {
 	frag_color = texture(s, st);
 })";
 
-tuple<GLuint, GLuint, GLuint, unsigned> create_mesh() {
-	constexpr GLfloat vertices[] = {
-		-1, -1, 0,
-		 1, -1, 0,
-		 1,  1, 0,
-		-1,  1, 0};
+//! \return vao, vbo and ibo (quad data has 6 indices)
+tuple<GLuint, GLuint, GLuint> create_quad();
 
-	constexpr GLuint indices[] = {
-		0, 1, 2,  2, 3, 0
-	};
-
-	unsigned index_count = sizeof(indices)/sizeof(GLuint);
-
-	GLuint vao;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, 4*3*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-
-	GLuint ibo;
-	glGenBuffers(1, &ibo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6*sizeof(GLuint), indices, GL_STATIC_DRAW);
-
-	return {vao, vbo, ibo, index_count};
-}
-
-
-// Function to draw the quad
-void drawQuad(GLuint quadVAO) {
-	glBindVertexArray(quadVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	glBindVertexArray(0);
-}
+//! Draw the quad created by create_quad function.
+void draw_quad(GLuint vao);
 
 // Simple structure to hold texture and maximum values
 struct TextureData {
@@ -187,8 +155,15 @@ void save_texture_as_png(GLuint textureID, std::string const & filename);
 
 void save_image_rgba(vector<float> const & pixels_rgba, size_t w, size_t h, string const & fname);
 
-void draw_texture(GLuint vao, unsigned int index_count, GLuint width, 
-	GLuint height, GLuint tid, GLuint texture_prog);
+//! Switch to the window framebuffer and render texture.
+void draw_texture(GLuint texture_id, GLuint width, GLuint height, GLuint texture_program, GLuint qaud_vao);
+
+//! \returns reduced texture id
+GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height, 
+	GLuint reduce_program, GLuint quad_vao);
+
+// Reads back RGBA32F texture data from OpenGL framebuffer for OpenGL ES 3.2.
+vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height);
 
 int main(int argc, char * argv[]) {
 	// process arguments
@@ -221,6 +196,7 @@ int main(int argc, char * argv[]) {
 	GLuint const reduce_shader_program = get_shader_program(vs_src.c_str(), fs_src.c_str());
 	assert(reduce_shader_program != 0);
 
+/*	
 	// Vertex data for a full-screen quad (positions only)
 	const float quadVertices[] = {
 		// positions (x,y)
@@ -291,6 +267,9 @@ int main(int argc, char * argv[]) {
 	// Reset bindings
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+*/
+
+	GLuint initialWidth = WIDTH, initialHeight = HEIGHT;
 
 	// create input data texture
 	TextureData tex = createDataTexture(initialWidth, initialHeight);  // GL_RGBA with GL_RGBA32F
@@ -301,6 +280,7 @@ int main(int argc, char * argv[]) {
 	// reduce
 
 	// Save current OpenGL state
+/*	
 	GLint prevViewport[4];
 	glGetIntegerv(GL_VIEWPORT, prevViewport);
 	
@@ -330,10 +310,19 @@ int main(int argc, char * argv[]) {
 
 	// Draw full-screen quad
 	drawQuad(quadVAO);
+*/
+
+	// NDC quad can be used to render into for reduce sahder and texture shader
+	auto const [quad_vao, quad_vbo, quad_ibo] = create_quad();
+
+	GLuint const reduced_texture_id = reduce_texture_half(inputTexture, 
+		initialWidth, initialHeight, reduce_shader_program, quad_vao);
 
 	{
-		vector<float> const pixels = read_back(fboA, currentWidth/2, currentHeight/2);
-		save_image_rgba(pixels, currentWidth/2, currentHeight/2, "reduction_1.png");
+		GLuint const w = initialWidth/2, 
+			h = initialHeight/2;
+		vector<float> const pixels = read_back_rgba32f(reduced_texture_id, w, h);
+		save_image_rgba(pixels, w, h, "reduction_1.png");
 	}
 
 /*	
@@ -397,9 +386,6 @@ int main(int argc, char * argv[]) {
 
 */
 
-	// mesh for drawing texture
-	auto [tmesh_vao, tmesh_vbo, tmesh_ibo, tmesh_index_count] = create_mesh();
-
 	// program for drawing texture
 	GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
 		assert(texture_shader_program != 0);
@@ -415,7 +401,7 @@ int main(int argc, char * argv[]) {
 			cout << "prepare new texture to render" << endl;
 		}
 
-		draw_texture(tmesh_vao, tmesh_index_count, WIDTH, HEIGHT, rendered_texture, texture_shader_program);
+		draw_texture(rendered_texture, WIDTH, HEIGHT, texture_shader_program, quad_vao);
 
 		SDL_GL_SwapWindow(window);
 	}
@@ -424,18 +410,18 @@ int main(int argc, char * argv[]) {
 	// glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 
-	glDeleteBuffers(1, &tmesh_vbo);
-	glDeleteBuffers(1, &tmesh_ibo);
-	glDeleteVertexArrays(1, &tmesh_vao);
+	glDeleteBuffers(1, &quad_vbo);
+	glDeleteBuffers(1, &quad_ibo);
+	glDeleteVertexArrays(1, &quad_vao);
 	glDeleteProgram(texture_shader_program);
 
 
 
-	glDeleteVertexArrays(1, &quadVAO);
-	glDeleteFramebuffers(1, &fboA);
-	glDeleteFramebuffers(1, &fboB);
-	glDeleteTextures(1, &textureA);
-	glDeleteTextures(1, &textureB);
+	// glDeleteVertexArrays(1, &quadVAO);
+	// glDeleteFramebuffers(1, &fboA);
+	// glDeleteFramebuffers(1, &fboB);
+	// glDeleteTextures(1, &textureA);
+	// glDeleteTextures(1, &textureB);
 	glDeleteProgram(reduce_shader_program);
 
 	SDL_GL_DeleteContext(context);
@@ -446,11 +432,81 @@ int main(int argc, char * argv[]) {
 }
 
 
-// switch to window framebuffer and render texture
-void draw_texture(GLuint vao, unsigned int index_count, GLuint width, 
-	GLuint height, GLuint tid, GLuint texture_prog) {
+// Reads back RGBA32F texture data from OpenGL framebuffer for OpenGL ES 3.2.
+vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height) {
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER,
+								GL_COLOR_ATTACHMENT0,
+								GL_TEXTURE_2D,
+								texture_id,
+								0);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		throw std::runtime_error("FBO incomplete");
+
+	// prepare storage
+	vector<float> data(width*height*4);
+	// read back floats
+	glReadPixels(0, 0, width, height,
+					GL_RGBA, GL_FLOAT,
+					data.data());
+
+	// cleanup
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDeleteFramebuffers(1, &fbo);
+
+	return data;
+}
+
+//! \returns reduced texture id
+GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height, 
+	GLuint reduce_program, GLuint quad_vao) {
 	
-	glBindVertexArray(vao);
+	// prepare framebuffer with texture attachement for reduction
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+
+	GLuint const reduced_w = width/2, reduced_h = height/2;
+
+	GLuint reduced_texture;
+	glGenTextures(1, &reduced_texture);
+	glBindTexture(GL_TEXTURE_2D, reduced_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, reduced_w, reduced_h, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, reduced_texture, 0);
+	
+	glViewport(0, 0, reduced_w, reduced_h);
+
+	// initialize shader program for reduction
+	glUseProgram(reduce_program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glUniform1i(glGetUniformLocation(reduce_program, "inputTexture"), 0);
+
+	float const w_texel_size = 1.0f / static_cast<float>(width),
+		h_texel_size = 1.0f / static_cast<float>(height);
+	
+	glUniform2f(glGetUniformLocation(reduce_program, "texelSize"), 
+					w_texel_size, h_texel_size);
+
+	draw_quad(quad_vao);
+
+	glDeleteFramebuffers(1, &fbo);
+
+	return reduced_texture;
+}
+
+//! Switch to the window framebuffer and render texture.
+void draw_texture(GLuint texture_id, GLuint width, GLuint height, 
+	GLuint texture_program, GLuint quad_vao) {
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);  // return to the default FB
 
@@ -459,24 +515,17 @@ void draw_texture(GLuint vao, unsigned int index_count, GLuint width,
 
 	// bind color_texture
 	// render texture
-	glUseProgram(texture_prog);
-
-	GLuint position_attr_id = 0;  // see position attribute in shader program
-	glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(position_attr_id);
+	glUseProgram(texture_program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tid);  // bind a texture to active texture unit (0)
+	glBindTexture(GL_TEXTURE_2D, texture_id);  // bind a texture to active texture unit (0)
 
-	GLint s_loc = glGetUniformLocation(texture_prog, "s");
+	GLint s_loc = glGetUniformLocation(texture_program, "s");
 	assert(s_loc != -1 && "unknown uniform");
 	glUniform1i(s_loc, 0);  // GL_TEXTURE0 + 0
 	
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-	glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
-	assert(glGetError() == GL_NO_ERROR && "opengl error");
-
-	glBindVertexArray(0);  // unbind vao
+	draw_quad(quad_vao);
 }
 
 
@@ -486,7 +535,6 @@ void save_image_rgba(vector<float> const & pixels_rgba, size_t w, size_t h, stri
 	im.write(fname);
 }
 
-// TODO: we should remove textureID,  it is misslieading, because we are reading from FBO, not texture
 // Reads from the current FBO and saves texture as PNG file
 void save_texture_as_png(GLuint textureID, std::string const & filename) {
 	// 1) Bind the texture
@@ -529,4 +577,47 @@ void save_texture_as_png(GLuint textureID, std::string const & filename) {
 
 	// 7) Write out as PNG
 	image.write(filename);
+}
+
+tuple<GLuint, GLuint, GLuint> create_quad() {
+	constexpr GLfloat vertices[] = {
+		-1, -1, 0,
+		 1, -1, 0,
+		 1,  1, 0,
+		-1,  1, 0};
+
+	constexpr GLuint indices[] = {
+		0, 1, 2,  2, 3, 0
+	};
+
+	//unsigned index_count = sizeof(indices)/sizeof(GLuint);  //=6
+
+	GLuint vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, 4*3*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+
+	GLuint ibo;
+	glGenBuffers(1, &ibo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6*sizeof(GLuint), indices, GL_STATIC_DRAW);
+
+	constexpr GLuint position_attr_id = 0;  // position attribute in shader program is expected to be 0, use `layout(location = 0)` syntax
+	glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(position_attr_id);
+
+	glBindVertexArray(0);  // unbind VAO
+
+	return {vao, vbo, ibo};
+}
+
+void draw_quad(GLuint vao) {
+	glBindVertexArray(vao);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	assert(glGetError() == GL_NO_ERROR && "opengl error");
+	glBindVertexArray(0);
 }
