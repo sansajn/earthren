@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <cassert>
+#include <format>
 #include <SDL.h>
 #include <GLES3/gl32.h>
 #include <Magick++.h>
@@ -315,16 +316,6 @@ int main(int argc, char * argv[]) {
 	// NDC quad can be used to render into for reduce sahder and texture shader
 	auto const [quad_vao, quad_vbo, quad_ibo] = create_quad();
 
-	GLuint const reduced_texture_id = reduce_texture_half(inputTexture, 
-		initialWidth, initialHeight, reduce_shader_program, quad_vao);
-
-	{
-		GLuint const w = initialWidth/2, 
-			h = initialHeight/2;
-		vector<float> const pixels = read_back_rgba32f(reduced_texture_id, w, h);
-		save_image_rgba(pixels, w, h, "reduction_1.png");
-	}
-
 /*	
 	// Update dimensions
 	currentWidth /= 2;
@@ -390,15 +381,38 @@ int main(int argc, char * argv[]) {
 	GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
 		assert(texture_shader_program != 0);
 
+	GLuint current_width = initialWidth, 
+		current_height = initialHeight;
+	GLuint rendered_texture = inputTexture;
+	GLuint reduce_level = 1;
+
 	while (true) {
 		SDL_Event event;
 		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
 			break;
 
-		GLuint rendered_texture = inputTexture;
-
 		if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
-			cout << "prepare new texture to render" << endl;
+			// create rgba32f texture for reduction
+			GLuint reduced_texture_id = reduce_texture_half(rendered_texture, 
+				current_width, current_height, reduce_shader_program, quad_vao);
+			
+			{  // save for debugging
+				GLuint const w = current_width/2, 
+					h = current_height/2;
+				vector<float> const pixels = read_back_rgba32f(reduced_texture_id, w, h);
+				save_image_rgba(pixels, w, h, std::format("reduction_{}.png", reduce_level));
+			}
+
+			if (rendered_texture != inputTexture)
+				glDeleteTextures(1, &rendered_texture);
+
+			rendered_texture = reduced_texture_id;
+			current_width /= 2;
+			current_height /= 2;
+			
+			cout << "texture reduce level " << reduce_level << endl;
+
+			reduce_level += 1;
 		}
 
 		draw_texture(rendered_texture, WIDTH, HEIGHT, texture_shader_program, quad_vao);
@@ -504,7 +518,9 @@ GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height,
 	return reduced_texture;
 }
 
-//! Switch to the window framebuffer and render texture.
+/*! Switch to the window framebuffer and render texture. 
+\param [in] width window width in pixels (not texture width)
+\param [in] height window height in pixels */
 void draw_texture(GLuint texture_id, GLuint width, GLuint height, 
 	GLuint texture_program, GLuint quad_vao) {
 	
