@@ -376,6 +376,12 @@ int main(int argc, char * argv[]) {
 
 			cout << "texture reduced to (" << w << "x" << h << "), level= " << reduce_level << endl;
 
+			if (w == 1 && h == 1) {
+				cout << "Final reduction result: (" << pixels[0] << ", "
+					<< pixels[1] << ", " << pixels[2] << ", "
+					<< pixels[3] << ")" << endl;
+			}
+
 			if (rendered_texture != inputTexture)
 				glDeleteTextures(1, &rendered_texture);
 
@@ -611,6 +617,8 @@ void draw_quad(GLuint vao) {
 // Create a texture with deterministic test data and track maximum values.
 TextureData createDataTexture(int width, int height) {
 	TextureData result;
+	result.width = width;
+	result.height = height;
 	
 	// Initialize max values to minimum possible float
 	for (int i = 0; i < 4; i++) {
@@ -626,8 +634,6 @@ TextureData createDataTexture(int width, int height) {
 	// Set texture parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	
 	// Allocate storage for the texture
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -651,7 +657,7 @@ TextureData createDataTexture(int width, int height) {
 			result.maxValues[1] = std::max(result.maxValues[1], g);
 			
 			// B: checkerboard pattern (0 or 50)
-			float const b = ((x + y) % 2 == 0) ? 0.5f : 0.0f;
+			float const b = 0.0f; //((x + y) % 2 == 0) ? 0.5f : 0.0f;
 			data[index + 2] = b;
 			result.maxValues[2] = std::max(result.maxValues[2], b);
 			
