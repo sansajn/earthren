@@ -187,6 +187,9 @@ void save_texture_as_png(GLuint textureID, std::string const & filename);
 
 void save_image_rgba(vector<float> const & pixels_rgba, size_t w, size_t h, string const & fname);
 
+void draw_texture(GLuint vao, unsigned int index_count, GLuint width, 
+	GLuint height, GLuint tid, GLuint texture_prog);
+
 int main(int argc, char * argv[]) {
 	// process arguments
 	Magick::InitializeMagick(*argv);
@@ -334,37 +337,17 @@ int main(int argc, char * argv[]) {
 	}
 
 
+	
+
+
 	{  // render texture to window framebuffer
-		// switch to window framebuffer and render texture
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);  // return to the default FB
+
+		auto [vao, vbo, ibo, index_count] = create_mesh();
 
 		GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
 		assert(texture_shader_program != 0);
 
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glViewport(0, 0, WIDTH, HEIGHT);
-
-		auto [vao, vbo, ibo, index_count] = create_mesh();
-
-		// bind color_texture
-		// render texture
-		glUseProgram(texture_shader_program);
-
-		GLuint position_attr_id = 0;  // see position attribute in shader program
-		glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(position_attr_id);
-
-		GLint s_loc = glGetUniformLocation(texture_shader_program, "s");
-		assert(s_loc != -1 && "unknown uniform");
-		glUniform1i(s_loc, 0);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, inputTexture);  // bind a texture to active texture unit (0)
-
-		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-		glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
-		assert(glGetError() == GL_NO_ERROR && "opengl error");
-
-		glBindVertexArray(0);  // unbind vao
+		draw_texture(vao, index_count, WIDTH, HEIGHT, inputTexture, texture_shader_program);
 
 		glDeleteBuffers(1, &vbo);
 		glDeleteBuffers(1, &ibo);
@@ -441,6 +424,10 @@ int main(int argc, char * argv[]) {
 		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
 			break;
 
+
+
+
+
 		SDL_GL_SwapWindow(window);
 	}
 
@@ -460,6 +447,38 @@ int main(int argc, char * argv[]) {
 	SDL_Quit();
 
 	return 0;
+}
+
+
+// switch to window framebuffer and render texture
+void draw_texture(GLuint vao, unsigned int index_count, GLuint width, 
+	GLuint height, GLuint tid, GLuint texture_prog) {
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);  // return to the default FB
+
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glViewport(0, 0, width, height);
+
+	// bind color_texture
+	// render texture
+	glUseProgram(texture_prog);
+
+	GLuint position_attr_id = 0;  // see position attribute in shader program
+	glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(position_attr_id);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, tid);  // bind a texture to active texture unit (0)
+
+	GLint s_loc = glGetUniformLocation(texture_prog, "s");
+	assert(s_loc != -1 && "unknown uniform");
+	glUniform1i(s_loc, 0);  // GL_TEXTURE0 + 0
+	
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
+	assert(glGetError() == GL_NO_ERROR && "opengl error");
+
+	glBindVertexArray(0);  // unbind vao
 }
 
 
