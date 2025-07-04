@@ -66,19 +66,6 @@ TextureData create_data_texture(int width, int height);
 
 TextureData load_from_image(string const & file_name);
 
-// TODO: we can remove
-vector<float> read_back(GLuint fbo, int width, int height) {
-	assert(width >= 1 && height >= 1 && "Width and height must be at least 1");
-	
-	vector<float> pixels(width * height * 4);  // RGBA format
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, pixels.data());
-
-	return pixels;
-}
-
-void save_texture_as_png(GLuint textureID, std::string const & filename);
-
 void save_image_rgba(vector<float> const & pixels_rgba, size_t w, size_t h, string const & fname);
 
 //! Switch to the window framebuffer and render texture.
@@ -487,50 +474,6 @@ void save_image_rgba(vector<float> const & pixels_rgba, size_t w, size_t h, stri
 	Magick::Image im;
 	im.read(w, h, "RGBA", Magick::StorageType::FloatPixel, pixels_rgba.data());
 	im.write(fname);
-}
-
-// Reads from the current FBO and saves texture as PNG file
-void save_texture_as_png(GLuint textureID, std::string const & filename) {
-	// 1) Bind the texture
-	glBindTexture(GL_TEXTURE_2D, textureID);
-
-	// 2) Query its dimensions
-	GLint width=0, height=0;
-	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &width);
-	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
-	if(width <= 0 || height <= 0) {
-		throw std::runtime_error("Texture has invalid dimensions");
-	}
-
-	// 3) Read back as floats
-	vector<float> floatData(width * height * 4);
-	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, floatData.data());
-
-	// 4) Convert floats to bytes [0..255]
-	vector<unsigned char> byteData(width * height * 4);
-	for(size_t i = 0; i < floatData.size(); ++i) {
-		float c = std::min(1.0f, std::max(0.0f, floatData[i]));
-		byteData[i] = static_cast<unsigned char>(c * 255.0f);
-	}
-
-	// 5) Flip vertically
-	vector<unsigned char> flipped(width * height * 4);
-	for(int y = 0; y < height; ++y) {
-		const unsigned char* srcRow = &byteData[(height - 1 - y) * width * 4];
-		unsigned char*       dstRow = &flipped[ y                * width * 4];
-		memcpy(dstRow, srcRow, width * 4);
-	}
-
-	// 6) Create Magick::Image from raw RGBA bytes
-	Magick::Image image(
-		width, height,
-		"RGBA"s,                 // pixel order
-		Magick::CharPixel,      // each channel is an unsigned char
-		flipped.data()          // pointer to your pixel buffer
-	);
-
-	// 7) Write out as PNG
-	image.write(filename);
 }
 
 tuple<GLuint, GLuint, GLuint> create_quad() {
