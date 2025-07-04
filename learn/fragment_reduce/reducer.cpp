@@ -58,7 +58,7 @@ struct TextureData {
 };
 
 // Create a texture with deterministic test data and track maximum values.
-TextureData createDataTexture(int width, int height);
+TextureData create_data_texture(int width, int height);
 
 TextureData load_from_image(string const & file_name) {
 	TextureData result;
@@ -242,9 +242,9 @@ int main(int argc, char * argv[]) {
 		initialWidth = tex.width;
 		initialHeight = tex.height;
 		cout << "Loaded image: " << argv[1] << " (" << tex.width << "x" << tex.height << ")\n";
-	} else {
-		tex = createDataTexture(initialWidth, initialHeight);
-	}
+	} 
+	else
+		tex = create_data_texture(initialWidth, initialHeight);
 
 	GLuint inputTexture = tex.textureId;
 
@@ -615,7 +615,7 @@ void draw_quad(GLuint vao) {
 }
 
 // Create a texture with deterministic test data and track maximum values.
-TextureData createDataTexture(int width, int height) {
+TextureData create_data_texture(int width, int height) {
 	TextureData result;
 	result.width = width;
 	result.height = height;
@@ -676,19 +676,19 @@ TextureData createDataTexture(int width, int height) {
 			magick_g = 0.75f,
 			magick_b = 0.6f;
 
-		// int specialIndex = (7 * width + 3) * 4;
-		// data[specialIndex + 0] = magick_r;  // Higher than any other red value
-		// result.maxValues[0] = magick_r;
+		int specialIndex = (7 * width + 3) * 4;
+		data[specialIndex + 0] = magick_r;  // Higher than any other red value
+		result.maxValues[0] = magick_r;
 		
-		// // Set a specific maximum value for green at position (8,2)
-		// specialIndex = (2 * width + 8) * 4;
-		// data[specialIndex + 1] = magick_g;  // Higher than any other green value
-		// result.maxValues[1] = magick_g;
+		// Set a specific maximum value for green at position (8,2)
+		specialIndex = (2 * width + 8) * 4;
+		data[specialIndex + 1] = magick_g;  // Higher than any other green value
+		result.maxValues[1] = magick_g;
 		
-		// // Set a specific maximum value for blue at position (5,5)
-		// specialIndex = (5 * width + 5) * 4;
-		// data[specialIndex + 2] = magick_b;  // Higher than any other blue value
-		// result.maxValues[2] = magick_b;
+		// Set a specific maximum value for blue at position (5,5)
+		specialIndex = (5 * width + 5) * 4;
+		data[specialIndex + 2] = magick_b;  // Higher than any other blue value
+		result.maxValues[2] = magick_b;
 
 		// int const specialIndex = (2 * width + 8) * 4;
 		// data[specialIndex + 0] = magick_r;
@@ -698,9 +698,9 @@ TextureData createDataTexture(int width, int height) {
 		// result.maxValues[1] = magick_g;
 		// result.maxValues[2] = magick_b;
 
-		int const special_index_2 = (8 + 10 * width) * 4;
-		data[special_index_2] = magick_r+0.2f;
-		result.maxValues[0] = magick_r+0.2f;
+		// int const special_index_2 = (8 + 10 * width) * 4;
+		// data[special_index_2] = magick_r+0.2f;
+		// result.maxValues[0] = magick_r+0.2f;
 	}
 	
 	// Upload data to the texture

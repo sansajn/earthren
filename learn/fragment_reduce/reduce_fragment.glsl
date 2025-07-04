@@ -12,25 +12,17 @@ uniform vec2 texelSize;
 layout(location = 0) out vec4 resultValue;
 
 void main() {
-	// Calculate the four sampling points using the center coordinate from vertex shader
-	vec2 texCoordNW = vTexCoord + vec2(-texelSize.x, -texelSize.y);
-	vec2 texCoordNE = vTexCoord + vec2( texelSize.x, -texelSize.y);
-	vec2 texCoordSW = vTexCoord + vec2(-texelSize.x,  texelSize.y);
-	vec2 texCoordSE = vTexCoord + vec2( texelSize.x,  texelSize.y);
-	
-	// Sample texels
-	vec4 value1 = texture(inputTexture, texCoordNW);
-	vec4 value2 = texture(inputTexture, texCoordNE);
-	vec4 value3 = texture(inputTexture, texCoordSW);
-	vec4 value4 = texture(inputTexture, texCoordSE);
-	
-	// Perform reduction operation
-	//resultValue = max(max(max(value1, value2), value3), value4);
+	// Get integer coordinates of the output pixel
+	ivec2 outCoord = ivec2(gl_FragCoord.xy);
 
-	resultValue.x = max(value1.x, max(value2.x, max(value3.x, value4.x)));
-	resultValue.y = max(value1.y, max(value2.y, max(value3.y, value4.y)));
-	resultValue.z = max(value1.z, max(value2.z, max(value3.z, value4.z)));
-	resultValue.w = max(value1.w, max(value2.w, max(value3.w, value4.w)));
+	// Compute the top-left input texture texel for this 2x2 block. Input texture is 2Wx2H size of the output texture.
+	vec2 baseCoord = (vec2(outCoord) * 2.0 + 0.5) * texelSize;
 
-	//resultValue = texture(inputTexture, vTexCoord);
+	// Sample the 2x2 block
+	vec4 value1 = texture(inputTexture, baseCoord);
+	vec4 value2 = texture(inputTexture, baseCoord + vec2(texelSize.x, 0.0));
+	vec4 value3 = texture(inputTexture, baseCoord + vec2(0.0, texelSize.y));
+	vec4 value4 = texture(inputTexture, baseCoord + texelSize);
+
+	resultValue = max(max(value1, value2), max(value3, value4));
 }
