@@ -1,9 +1,6 @@
 #version 320 es
 precision highp float;
 
-// Input from vertex shader
-in vec2 vTexCoord;
-
 // Input texture from previous pass
 uniform sampler2D inputTexture;
 uniform vec2 texelSize;
@@ -15,7 +12,7 @@ void main() {
 	// Get integer coordinates of the output pixel
 	ivec2 outCoord = ivec2(gl_FragCoord.xy);
 
-	// Compute the top-left input texture texel for this 2x2 block. Input texture is 2Wx2H size of the output texture.
+	// Compute the top-left input texture texel for this 2x2 block. Note, input texture is 2Wx2H size of the output texture.
 	vec2 baseCoord = (vec2(outCoord) * 2.0 + 0.5) * texelSize;
 
 	// Sample the 2x2 block

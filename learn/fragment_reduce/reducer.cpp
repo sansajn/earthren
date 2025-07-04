@@ -22,6 +22,10 @@ using namespace std::string_literals;
 constexpr GLuint WIDTH = 512,
 	HEIGHT = 512;
 
+path const PASSTHROUGH_VERTEX_PROGRAM_PATH = "passthrough.vert",
+	REDUCE_FRAGMENT_PROGRAM_PATH = "reduce_fragment.frag";
+
+
 // Shader programs to render texture into FBO.
 char const * texture_vs_src = R"(
 #version 320 es
@@ -60,49 +64,7 @@ struct TextureData {
 // Create a texture with deterministic test data and track maximum values.
 TextureData create_data_texture(int width, int height);
 
-TextureData load_from_image(string const & file_name) {
-	TextureData result;
-
-	// Load image using Magick++
-	Magick::Image image;
-	image.read(file_name);
-
-	// Get image dimensions
-	int const w = image.columns(), h = image.rows();
-
-	// Resize data vector to hold RGBA values
-	result.data.resize(w * h * 4);
-	
-	// Copy pixel data from Magick++ Image to our vector
-	image.write(0, 0, w, h, "RGBA", Magick::StorageType::FloatPixel, result.data.data());
-
-	// Set maximum values for each channel
-	for (int i = 0; i < 4; i++) {
-		result.maxValues[i] = -std::numeric_limits<float>::max();
-	}
-
-	// create OpenGL texture
-	glGenTextures(1, &result.textureId);
-	glBindTexture(GL_TEXTURE_2D, result.textureId);
-	
-	// Set texture parameters
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	
-	// Allocate storage for the texture
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-	
-	// Upload data to the texture
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_FLOAT, result.data.data());
-	
-	result.width = w;
-	result.height = h;
-
-	return result;
-}
-
+TextureData load_from_image(string const & file_name);
 
 // TODO: we can remove
 vector<float> read_back(GLuint fbo, int width, int height) {
@@ -153,8 +115,8 @@ int main(int argc, char * argv[]) {
 	// we want to read texture
 	size_t const texture_w = WIDTH, texture_h = HEIGHT;
 
-	string const vs_src = read_file("minimal_vertex.glsl"),
-		fs_src = read_file("reduce_fragment.glsl");
+	string const vs_src = read_file(PASSTHROUGH_VERTEX_PROGRAM_PATH),
+		fs_src = read_file(REDUCE_FRAGMENT_PROGRAM_PATH);
 	assert(!vs_src.empty() && !fs_src.empty() && "Shader source files must not be empty");
 
 	GLuint const reduce_shader_program = get_shader_program(vs_src.c_str(), fs_src.c_str());
@@ -713,5 +675,48 @@ TextureData create_data_texture(int width, int height) {
 	printf("  Blue:  %.2f\n", result.maxValues[2]);
 	printf("  Alpha: %.2f\n", result.maxValues[3]);
 	
+	return result;
+}
+
+TextureData load_from_image(string const & file_name) {
+	TextureData result;
+
+	// Load image using Magick++
+	Magick::Image image;
+	image.read(file_name);
+
+	// Get image dimensions
+	int const w = image.columns(), h = image.rows();
+
+	// Resize data vector to hold RGBA values
+	result.data.resize(w * h * 4);
+	
+	// Copy pixel data from Magick++ Image to our vector
+	image.write(0, 0, w, h, "RGBA", Magick::StorageType::FloatPixel, result.data.data());
+
+	// Set maximum values for each channel
+	for (int i = 0; i < 4; i++) {
+		result.maxValues[i] = -std::numeric_limits<float>::max();
+	}
+
+	// create OpenGL texture
+	glGenTextures(1, &result.textureId);
+	glBindTexture(GL_TEXTURE_2D, result.textureId);
+	
+	// Set texture parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	
+	// Allocate storage for the texture
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+	
+	// Upload data to the texture
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_FLOAT, result.data.data());
+	
+	result.width = w;
+	result.height = h;
+
 	return result;
 }
