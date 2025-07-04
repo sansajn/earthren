@@ -634,7 +634,9 @@ TextureData createDataTexture(int width, int height) {
 	// Set texture parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
 	// Allocate storage for the texture
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 	
@@ -670,22 +672,35 @@ TextureData createDataTexture(int width, int height) {
 	// Add a few specific high values to test max reduction
 	if (width >= 10 && height >= 10) {
 		// Set a specific maximum value for red at position (3,7)
-		float const magick_r = 0.5f;
-		int specialIndex = (7 * width + 3) * 4;
-		data[specialIndex + 0] = magick_r;  // Higher than any other red value
-		result.maxValues[0] = magick_r;
+		float const magick_r = 0.5f,
+			magick_g = 0.75f,
+			magick_b = 0.6f;
+
+		// int specialIndex = (7 * width + 3) * 4;
+		// data[specialIndex + 0] = magick_r;  // Higher than any other red value
+		// result.maxValues[0] = magick_r;
 		
-		// Set a specific maximum value for green at position (8,2)
-		float const magick_g = 0.75f;
-		specialIndex = (2 * width + 8) * 4;
-		data[specialIndex + 1] = magick_g;  // Higher than any other green value
-		result.maxValues[1] = magick_g;
+		// // Set a specific maximum value for green at position (8,2)
+		// specialIndex = (2 * width + 8) * 4;
+		// data[specialIndex + 1] = magick_g;  // Higher than any other green value
+		// result.maxValues[1] = magick_g;
 		
-		// Set a specific maximum value for blue at position (5,5)
-		float const magick_b = 0.6f;
-		specialIndex = (5 * width + 5) * 4;
-		data[specialIndex + 2] = magick_b;  // Higher than any other blue value
-		result.maxValues[2] = magick_b;
+		// // Set a specific maximum value for blue at position (5,5)
+		// specialIndex = (5 * width + 5) * 4;
+		// data[specialIndex + 2] = magick_b;  // Higher than any other blue value
+		// result.maxValues[2] = magick_b;
+
+		// int const specialIndex = (2 * width + 8) * 4;
+		// data[specialIndex + 0] = magick_r;
+		// data[specialIndex + 1] = magick_g;  // Higher than any other green value
+		// data[specialIndex + 2] = magick_b;
+		// result.maxValues[0] = magick_r;
+		// result.maxValues[1] = magick_g;
+		// result.maxValues[2] = magick_b;
+
+		int const special_index_2 = (8 + 10 * width) * 4;
+		data[special_index_2] = magick_r+0.2f;
+		result.maxValues[0] = magick_r+0.2f;
 	}
 	
 	// Upload data to the texture
