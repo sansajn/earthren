@@ -75,7 +75,7 @@ void draw_texture(GLuint texture_id, GLuint width, GLuint height, GLuint texture
 GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height, 
 	GLuint reduce_program, GLuint quad_vao);
 
-// Reads back RGBA32F texture data from OpenGL framebuffer for OpenGL ES 3.2.
+//! Reads back RGBA32F texture data from OpenGL framebuffer for OpenGL ES 3.2.
 vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height);
 
 int main(int argc, char * argv[]) {
@@ -109,79 +109,6 @@ int main(int argc, char * argv[]) {
 	GLuint const reduce_shader_program = get_shader_program(vs_src.c_str(), fs_src.c_str());
 	assert(reduce_shader_program != 0);
 
-/*	
-	// Vertex data for a full-screen quad (positions only)
-	const float quadVertices[] = {
-		// positions (x,y)
-		-1.0f,  1.0f,  // top-left
-		-1.0f, -1.0f,  // bottom-left
-		1.0f, -1.0f,  // bottom-right
-		
-		-1.0f,  1.0f,  // top-left
-		1.0f, -1.0f,  // bottom-right
-		1.0f,  1.0f   // top-right
-	};
-
-	// Create and bind VAO, VBO
-	GLuint quadVAO, quadVBO;
-	glGenVertexArrays(1, &quadVAO);
-	glGenBuffers(1, &quadVBO);
-	glBindVertexArray(quadVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-
-	// Position attribute
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	// unbind for now
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-
-
-	// setup FBOs and textures for reduction
-
-	// Ping-pong FBOs and textures for reduction passes
-	GLuint fboA, fboB;
-	GLuint textureA, textureB;
-	int initialWidth = WIDTH, initialHeight = HEIGHT;
-
-	// Create FBOs
-	glGenFramebuffers(1, &fboA);
-	glGenFramebuffers(1, &fboB);
-	
-	// Create textures
-	glGenTextures(1, &textureA);
-	glGenTextures(1, &textureB);
-	
-	// Setup texture A
-	glBindTexture(GL_TEXTURE_2D, textureA);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, initialWidth/2, initialHeight/2, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	
-	// Setup texture B
-	glBindTexture(GL_TEXTURE_2D, textureB);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, initialWidth/4, initialHeight/4, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	
-	// Attach textures to FBOs
-	glBindFramebuffer(GL_FRAMEBUFFER, fboA);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureA, 0);
-	
-	glBindFramebuffer(GL_FRAMEBUFFER, fboB);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureB, 0);
-	
-	// Reset bindings
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-*/
-
 	GLuint initialWidth = WIDTH, initialHeight = HEIGHT;
 
 	// create input data texture
@@ -199,104 +126,8 @@ int main(int argc, char * argv[]) {
 
 	save_image_rgba(tex.data, initialWidth, initialHeight, "reduction_0.png");
 
-	// reduce
-
-	// Save current OpenGL state
-/*	
-	GLint prevViewport[4];
-	glGetIntegerv(GL_VIEWPORT, prevViewport);
-	
-	// Use reduction shader
-	glUseProgram(reduce_shader_program);
-
-	// Initial dimensions
-	int currentWidth = initialWidth;
-	int currentHeight = initialHeight;
-
-	// First pass: input texture -> texture A
-	glBindFramebuffer(GL_FRAMEBUFFER, fboA);
-	glViewport(0, 0, currentWidth/2, currentHeight/2);
-	
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, inputTexture);
-	glUniform1i(glGetUniformLocation(reduce_shader_program, "inputTexture"), 0);
-	
-	{
-		float const w_texel_size = 1.0f / static_cast<float>(currentWidth/2),  // TODO: copilot adviced 1/currentWidth
-			h_texel_size = 1.0f / static_cast<float>(currentHeight/2);
-		
-		glUniform2f(glGetUniformLocation(reduce_shader_program, "texelSize"), 
-						w_texel_size, h_texel_size);
-		cout << "Texel size: (" << w_texel_size << ", " << h_texel_size << ")\n";
-	}
-
-	// Draw full-screen quad
-	drawQuad(quadVAO);
-*/
-
 	// NDC quad can be used to render into for reduce sahder and texture shader
-	auto const [quad_vao, quad_vbo, quad_ibo] = create_quad();
-
-/*	
-	// Update dimensions
-	currentWidth /= 2;
-	currentHeight /= 2;
-
-	// Ping-pong between FBOs until we reach a small size
-	GLuint currentInputTexture = textureA;
-	GLuint currentFBO = fboB;
-	GLuint currentOutputTexture = textureB;
-
-	int reduce_iteration = 1;
-	while (currentWidth > 1 || currentHeight > 1) {
-		// Bind output FBO
-		glBindFramebuffer(GL_FRAMEBUFFER, currentFBO);
-		glViewport(0, 0, std::max(1, currentWidth/2), std::max(1, currentHeight/2));
-		
-		// Set input texture and uniforms
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, currentInputTexture);
-		glUniform1i(glGetUniformLocation(reduce_shader_program, "inputTexture"), 0);  // 0 is texture-unit index, in our case 0 (GL_TEXTURE0 from glActivateTexture call)
-		
-		{
-			float const w_texel_size = 1.0f / static_cast<float>(currentWidth/2),  // TODO: copilot adviced 1/currentWidth
-				h_texel_size = 1.0f / static_cast<float>(currentHeight/2);
-			
-			glUniform2f(glGetUniformLocation(reduce_shader_program, "texelSize"), 
-							w_texel_size, h_texel_size);
-			cout << "Texel size: (" << w_texel_size << ", " << h_texel_size << ")\n";
-		}
-		
-		drawQuad(quadVAO);
-		
-		if (reduce_iteration == 2) {
-			vector<float> const pixels = read_back(currentFBO, currentWidth/2, currentHeight/2);
-			save_image_rgba(pixels, currentWidth/2, currentHeight/2, "reduction_2.png");
-		}
-
-		// Swap input and output for next pass
-		currentInputTexture = currentOutputTexture;
-		currentFBO = (currentFBO == fboA) ? fboB : fboA;
-		currentOutputTexture = (currentOutputTexture == textureA) ? textureB : textureA;
-
-		cout << "Reduction iteration: " << reduce_iteration 
-			<< ", (width=)" << currentWidth << ", (height=)" << currentHeight
-			<< '\n';
-
-		// Update dimensions
-		currentWidth = std::max(1, currentWidth/2);
-		currentHeight = std::max(1, currentHeight/2);
-		
-		reduce_iteration += 1;
-	}
-
-	// TODO: make a funciton to read back texture data from bellow code
-
-	vector<float> result = read_back(currentFBO == fboA ? fboB : fboA, 1, 1);
-	cout << "Reduction result: (" << result[0] << ", " << result[1] << ", "
-		<< result[2] << ", " << result[3] << ")" << endl;
-
-*/
+	auto const [ndcquad_vao, ndcquad_vbo, ndcquad_ibo] = create_quad();
 
 	// program for drawing texture
 	GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
@@ -315,7 +146,7 @@ int main(int argc, char * argv[]) {
 		if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
 			// create rgba32f texture for reduction
 			GLuint reduced_texture_id = reduce_texture_half(rendered_texture, 
-				current_width, current_height, reduce_shader_program, quad_vao);
+				current_width, current_height, reduce_shader_program, ndcquad_vao);
 			
 			// save for debugging
 			GLuint const w = current_width/2, 
@@ -340,27 +171,16 @@ int main(int argc, char * argv[]) {
 			reduce_level += 1;
 		}
 
-		draw_texture(rendered_texture, WIDTH, HEIGHT, texture_shader_program, quad_vao);
+		draw_texture(rendered_texture, WIDTH, HEIGHT, texture_shader_program, ndcquad_vao);
 
 		SDL_GL_SwapWindow(window);
 	}
 
-	// Restore previous OpenGL state
-	// glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	// glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-	glDeleteBuffers(1, &quad_vbo);
-	glDeleteBuffers(1, &quad_ibo);
-	glDeleteVertexArrays(1, &quad_vao);
+	glDeleteBuffers(1, &ndcquad_vbo);
+	glDeleteBuffers(1, &ndcquad_ibo);
+	glDeleteVertexArrays(1, &ndcquad_vao);
 	glDeleteProgram(texture_shader_program);
 
-
-
-	// glDeleteVertexArrays(1, &quadVAO);
-	// glDeleteFramebuffers(1, &fboA);
-	// glDeleteFramebuffers(1, &fboB);
-	// glDeleteTextures(1, &textureA);
-	// glDeleteTextures(1, &textureB);
 	glDeleteProgram(reduce_shader_program);
 
 	SDL_GL_DeleteContext(context);
