@@ -441,12 +441,12 @@ GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height,
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture_id);
-	glUniform1i(glGetUniformLocation(reduce_program, "inputTexture"), 0);
+	glUniform1i(glGetUniformLocation(reduce_program, "u_input_texture"), 0);
 
 	float const w_texel_size = 1.0f / static_cast<float>(width),
 		h_texel_size = 1.0f / static_cast<float>(height);
 	
-	glUniform2f(glGetUniformLocation(reduce_program, "texelSize"), 
+	glUniform2f(glGetUniformLocation(reduce_program, "u_texel_size"),
 					w_texel_size, h_texel_size);
 
 	draw_quad(quad_vao);
