@@ -3,7 +3,7 @@ precision highp float;
 
 // Input texture from previous pass
 uniform sampler2D u_input_texture;
-uniform vec2 u_texel_size;
+uniform vec2 u_texel_size;  //!< Input texture texel size in pixels (=1/width, 1/height).
 
 // Output
 layout(location = 0) out vec4 out_result_pixel;

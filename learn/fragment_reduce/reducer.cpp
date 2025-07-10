@@ -358,21 +358,21 @@ int main(int argc, char * argv[]) {
 
 		glUseProgram(reduce_shader_program);  // see reduction shader
 
-		GLuint current_width = initialWidth, 
-			current_height = initialHeight;
+		GLuint input_width = initialWidth, 
+			input_height = initialHeight;
 
 		// TODO: dan we use do-while loop here?
 		// First pass: input texture -> texture A
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo_a);
-		glViewport(0, 0, current_width/2, current_height/2);
+		glViewport(0, 0, input_width/2, input_height/2);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, inputTexture);
 		glUniform1i(glGetUniformLocation(reduce_shader_program, "u_input_texture"), 0);
 
 		{
-			float const w_texel_size = 1.0f / static_cast<float>(current_width),
-				h_texel_size = 1.0f / static_cast<float>(current_height);
+			float const w_texel_size = 1.0f / static_cast<float>(input_width),
+				h_texel_size = 1.0f / static_cast<float>(input_height);
 			glUniform2f(glGetUniformLocation(reduce_shader_program, "u_texel_size"), 
 				w_texel_size, h_texel_size);
 		}
@@ -380,14 +380,14 @@ int main(int argc, char * argv[]) {
 		draw_quad(ndcquad_vao);  // render to FBO texture
 
 		{  // save for debugging
-			GLuint const w = current_width/2, 
-				h = current_height/2;
+			GLuint const w = input_width/2, 
+				h = input_height/2;
 			vector<float> const pixels = read_back_rgba32f(texture_a, w, h);
 			save_image_rgba(pixels, w, h, "reduction_1.png");
 		}
 
-		current_width /= 2;
-		current_height /= 2;
+		input_width /= 2;
+		input_height /= 2;
 
 		GLuint current_input_texture = texture_a;
 		GLuint current_fbo = fbo_b;
@@ -395,10 +395,13 @@ int main(int argc, char * argv[]) {
 
 		int reduce_iteration = 2;
 
-		while (current_width > 1 || current_height > 1) {
+		while (input_width > 1 || input_height > 1) {
+			GLuint const output_width = max(1u, input_width/2),
+				output_height = max(1u, input_height/2);
+			
 			// Bind output FBO
 			glBindFramebuffer(GL_FRAMEBUFFER, current_fbo);
-			glViewport(0, 0, max(1u, current_width/2), max(1u, current_height/2));
+			glViewport(0, 0, output_width, output_height);
 
 			// Set input texture and uniforms
 			glActiveTexture(GL_TEXTURE0);
@@ -406,8 +409,8 @@ int main(int argc, char * argv[]) {
 			glUniform1i(glGetUniformLocation(reduce_shader_program, "u_input_texture"), 0);  // 0 is texture-unit index, in our case 0 (GL_TEXTURE0 from glActivateTexture call)
 
 			{
-				float const w_texel_size = 1.0f / static_cast<float>(current_width),
-					h_texel_size = 1.0f / static_cast<float>(current_height);
+				float const w_texel_size = 1.0f / static_cast<float>(input_width),
+					h_texel_size = 1.0f / static_cast<float>(input_height);
 				glUniform2f(glGetUniformLocation(reduce_shader_program, "u_texel_size"), 
 					w_texel_size, h_texel_size);
 			}
@@ -416,27 +419,34 @@ int main(int argc, char * argv[]) {
 
 			{
 				// save for debugging
-				GLuint const w = current_width/2, 
-					h = current_height/2;
-				vector<float> const pixels = read_back_rgba32f(current_output_texture, w, h);
-				save_image_rgba(pixels, w, h, std::format("reduction_{}.png", reduce_iteration));
+				vector<float> const pixels = read_back_rgba32f(current_output_texture, output_width, output_height);
+				save_image_rgba(pixels, output_width, output_height, std::format("reduction_{}.png", reduce_iteration));
 			}
 
 			// swap FBOs
-			current_input_texture = current_output_texture;
-			current_fbo = (current_fbo == fbo_a) ? fbo_b : fbo_a;
-			current_output_texture = (current_output_texture == texture_a) ? texture_b : texture_a;
+			if (current_fbo == fbo_a) {
+				current_fbo = fbo_b;
+				current_output_texture = texture_b;
+				current_input_texture = texture_a;
+			}
+			else {
+				current_fbo = fbo_a;
+				current_output_texture = texture_a;
+				current_input_texture = texture_b;
+			}
 
 			cout << "Reduction iteration: " << reduce_iteration 
-				<< ", (width=)" << current_width/2 << ", (height=)" << current_height/2
+				<< ", (width=)" << output_width << ", (height=)" << output_height
 				<< '\n';
 
-			// update dimensions
-			current_width = max(1u, current_width/2);
-			current_height = max(1u, current_height/2);
+			// update dimensions for next iteration
+			input_width = output_width;
+			input_height = output_height;
 
 			reduce_iteration += 1;
 		}
+
+		assert(input_width == 1 && input_height == 1 && "Final reduction should be 1x1 pixel");
 
 		// read back result
 		vector<float> const result = read_back(current_fbo, 1, 1);
