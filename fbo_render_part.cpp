@@ -54,7 +54,8 @@ void main() {
 	frag_color = texture(s, st);
 })";
 
-tuple<GLuint, GLuint, GLuint, unsigned> create_mesh();
+tuple<GLuint, GLuint, GLuint> create_ndc_quad();
+void draw_quad(GLuint vao);
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	// process arguments
@@ -75,7 +76,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		<< "GL_RENDERER: " << glGetString(GL_RENDERER) << "\n"
 		<< "GLSL_VERSION: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
 
-	GLuint color_texture;
+	auto [ndc_vao, ndc_vbo, ndc_ibo] = create_ndc_quad();
+
+	GLuint color_texture;  // shared texture
 
 	{ // render into framebuffer
 		// create framebuffer object (FBO) and bind
@@ -165,15 +168,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glViewport(0, 0, WIDTH, HEIGHT);
 
-		auto [vao, vbo, ibo, index_count] = create_mesh();
+		// auto [vao, vbo, ibo, index_count] = create_ndc_quad();
 
 		// bind color_texture
 		// render texture
 		glUseProgram(texture_shader_program);
 
-		GLuint position_attr_id = 0;  // see position attribute in shader program
-		glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(position_attr_id);
+		// GLuint position_attr_id = 0;  // see position attribute in shader program
+		// glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		// glEnableVertexAttribArray(position_attr_id);
 
 		GLint s_loc = glGetUniformLocation(texture_shader_program, "s");
 		assert(s_loc != -1 && "unknown uniform");
@@ -182,18 +185,26 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glBindTexture(GL_TEXTURE_2D, color_texture);  // bind a texture to active texture unit (0)
 
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-		glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
-		assert(glGetError() == GL_NO_ERROR && "opengl error");
+		// glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
+		// assert(glGetError() == GL_NO_ERROR && "opengl error");
+		draw_quad(ndc_vao);
 
 		glBindVertexArray(0);  // unbind vao
 
-		glDeleteBuffers(1, &vbo);
-		glDeleteBuffers(1, &ibo);
-		glDeleteVertexArrays(1, &vao);
+		// glDeleteBuffers(1, &vbo);
+		// glDeleteBuffers(1, &ibo);
+		// glDeleteVertexArrays(1, &vao);
 		glDeleteProgram(texture_shader_program);
 	}  // render texture
 
+
 	glDeleteTextures(1, &color_texture);
+
+	glDeleteBuffers(1, &ndc_vbo);
+	glDeleteBuffers(1, &ndc_ibo);
+	glDeleteVertexArrays(1, &ndc_vao);
+	// glDeleteProgram(texture_shader_program);
+	// TODO: cleanup
 
 	while (true) {
 		SDL_Event event;
@@ -210,8 +221,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	return 0;
 }
 
-tuple<GLuint, GLuint, GLuint, unsigned> create_mesh() {
-	// GL_TRIANGLES
+tuple<GLuint, GLuint, GLuint> create_ndc_quad() {
 	constexpr GLfloat vertices[] = {
 		-1, -1, 0,
 		 1, -1, 0,
@@ -222,7 +232,7 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_mesh() {
 		0, 1, 2,  2, 3, 0
 	};
 
-	unsigned index_count = sizeof(indices)/sizeof(GLuint);
+	//unsigned index_count = sizeof(indices)/sizeof(GLuint);  //=6
 
 	GLuint vao;
 	glGenVertexArrays(1, &vao);
@@ -238,5 +248,18 @@ tuple<GLuint, GLuint, GLuint, unsigned> create_mesh() {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6*sizeof(GLuint), indices, GL_STATIC_DRAW);
 
-	return {vao, vbo, ibo, index_count};
+	constexpr GLuint position_attr_id = 0;  // position attribute in shader program is expected to be 0, use `layout(location = 0)` syntax
+	glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(position_attr_id);
+
+	glBindVertexArray(0);  // unbind VAO
+
+	return {vao, vbo, ibo};
+}
+
+void draw_quad(GLuint vao) {
+	glBindVertexArray(vao);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	assert(glGetError() == GL_NO_ERROR && "opengl error");
+	glBindVertexArray(0);
 }
