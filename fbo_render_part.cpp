@@ -150,13 +150,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	}  // render texture
 
 
+	// cleanup
 	glDeleteTextures(1, &color_texture);
-
 	glDeleteBuffers(1, &ndc_vbo);
 	glDeleteBuffers(1, &ndc_ibo);
 	glDeleteVertexArrays(1, &ndc_vao);
-	// glDeleteProgram(texture_shader_program);
-	// TODO: cleanup
 
 	while (true) {
 		SDL_Event event;
