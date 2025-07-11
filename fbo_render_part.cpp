@@ -89,11 +89,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		// create color buffer texture
 		glGenTextures(1, &color_texture);
 		glBindTexture(GL_TEXTURE_2D, color_texture);
-		glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, FBO_WIDTH, FBO_HEIGHT);
-
-		// turn off mipmaps for color texture
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, FBO_WIDTH, FBO_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 		// attach color and depth textures to the FBO
 		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color_texture, 0);
@@ -120,6 +120,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		assert(glGetError() == GL_NO_ERROR && "opengl error");
 
 		glDeleteProgram(object_shader_program);
+		glDeleteFramebuffers(1, &fbo);
 	}  // render into framebuffer
 
 	{  // render texture
