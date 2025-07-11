@@ -102,7 +102,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		GLenum draw_buffers[] = {GL_COLOR_ATTACHMENT0};
 		glDrawBuffers(1, draw_buffers);
 
-		GLenum fbo_status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+		GLenum const fbo_status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
 		assert(fbo_status == GL_FRAMEBUFFER_COMPLETE);
 
 		// render triangle info FBO
@@ -117,7 +117,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		draw_quad(ndc_vao);
-		assert(glGetError() == GL_NO_ERROR && "opengl error");
 
 		glDeleteProgram(object_shader_program);
 		glDeleteFramebuffers(1, &fbo);
