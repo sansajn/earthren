@@ -95,15 +95,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-		// create depth buffer exture
-		GLuint depth_texture;
-		glGenTextures(1, &depth_texture);
-		glBindTexture(GL_TEXTURE_2D, depth_texture);
-		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, FBO_WIDTH, FBO_HEIGHT);
-
 		// attach color and depth textures to the FBO
 		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color_texture, 0);
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_texture, 0);
 
 		// tell OpenGL that we want to draw into the framebuffer's color attachement
 		GLenum draw_buffers[] = {GL_COLOR_ATTACHMENT0};
@@ -118,43 +111,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		assert(object_shader_program != 0);
 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glViewport(0, 0, FBO_WIDTH, FBO_HEIGHT);
-
-		GLfloat vertices[] = {
-			-.5f, -.5f, .0f,
-			.5f, -.5f, .0f,
-			.0f, .5f, .0f};
-
-		GLfloat colors[] = {
-			1.0f, .0f, .0f, 1.0f,
-			.0f, 1.0f, .0f, 1.0f,
-			.0f, .0f, 1.0f, 1.0f};
-
-		GLuint vao;
-		glGenVertexArrays(1, &vao);
-		glBindVertexArray(vao);
-
-		GLuint tribuf;
-		glGenBuffers(1, &tribuf);
-		glBindBuffer(GL_ARRAY_BUFFER, tribuf);
-		glBufferData(GL_ARRAY_BUFFER, 7*3*sizeof(GLfloat), nullptr, GL_STATIC_DRAW);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, 3*3*sizeof(GLfloat), (GLvoid *)vertices);
-		glBufferSubData(GL_ARRAY_BUFFER, 3*3*sizeof(GLfloat), 3*4*sizeof(GLfloat), (GLvoid *)colors);
-
-		GLuint object_position_attr_id = 0;  // see position attribute in shader program
-		glVertexAttribPointer(object_position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(object_position_attr_id);
+		glViewport(0, 0, FBO_WIDTH/2, FBO_HEIGHT/2);  // render only into part of the FBO texture
 
 		glUseProgram(object_shader_program);
 
-		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glClear(GL_COLOR_BUFFER_BIT);
+		draw_quad(ndc_vao);
 		assert(glGetError() == GL_NO_ERROR && "opengl error");
 
-		glBindVertexArray(0);  // unbind vao
-
-		glDeleteBuffers(1, &tribuf);
-		glDeleteVertexArrays(1, &vao);
 		glDeleteProgram(object_shader_program);
 	}  // render into framebuffer
 
@@ -168,15 +132,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glViewport(0, 0, WIDTH, HEIGHT);
 
-		// auto [vao, vbo, ibo, index_count] = create_ndc_quad();
-
 		// bind color_texture
 		// render texture
 		glUseProgram(texture_shader_program);
-
-		// GLuint position_attr_id = 0;  // see position attribute in shader program
-		// glVertexAttribPointer(position_attr_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		// glEnableVertexAttribArray(position_attr_id);
 
 		GLint s_loc = glGetUniformLocation(texture_shader_program, "s");
 		assert(s_loc != -1 && "unknown uniform");
@@ -185,15 +143,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glBindTexture(GL_TEXTURE_2D, color_texture);  // bind a texture to active texture unit (0)
 
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-		// glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
-		// assert(glGetError() == GL_NO_ERROR && "opengl error");
 		draw_quad(ndc_vao);
 
-		glBindVertexArray(0);  // unbind vao
-
-		// glDeleteBuffers(1, &vbo);
-		// glDeleteBuffers(1, &ibo);
-		// glDeleteVertexArrays(1, &vao);
 		glDeleteProgram(texture_shader_program);
 	}  // render texture
 
