@@ -134,6 +134,11 @@ target_link_libraries(triangle ${BASIC_COMMON_LIBRARIES})
 add_executable(fbo_render fbo_render.cpp shader.cpp)
 target_link_libraries(fbo_render ${WITH_IMAGE})
 
+# render into part of FBO
+add_executable(fbo_render_part fbo_render_part.cpp shader.cpp)
+target_link_libraries(fbo_render_part ${WITH_IMAGE})
+
+
 add_executable(reduce_shader reduce_shader.cpp shader.cpp)
 target_link_libraries(reduce_shader ${WITH_IMAGE})
 

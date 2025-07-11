@@ -14,6 +14,7 @@ earthren.cxxflags
 earthren.files
 earthren.includes
 fbo_render.cpp
+fbo_render_part.cpp
 flat_shader.cpp
 flat_shader.fs
 flat_shader.hpp
