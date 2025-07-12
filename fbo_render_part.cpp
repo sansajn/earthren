@@ -6,7 +6,6 @@
 #include <cassert>
 #include <SDL.h>
 #include <GLES3/gl32.h>
-#include <Magick++.h>
 #include "shader.hpp"
 
 using std::cout, std::endl;
@@ -19,14 +18,15 @@ constexpr GLuint WIDTH = 800,
 	FBO_WIDTH = 512,
 	FBO_HEIGHT = 512;
 
-char const * object_vs_src = R"(
+// Shader programs to fill geometry.
+char const * passthrough_vert = R"(
 #version 320 es
 layout(location = 0) in vec3 position;
 void main() {
 	gl_Position = vec4(position, 1.0f);
 })";
 
-char const * object_fs_src = R"(
+char const * fill_frag = R"(
 #version 320 es
 precision mediump float;
 out vec4 frag_color;
@@ -35,7 +35,7 @@ void main() {
 })";
 
 // Shader programs to render texture into FBO.
-char const * texture_vs_src = R"(
+char const * texture_render_vert = R"(
 #version 320 es
 layout(location = 0) in vec3 position;  // we expect NDC rectangle ((-1,-1), (1,1))
 out vec2 st;
@@ -44,7 +44,7 @@ void main() {
 	gl_Position = vec4(position, 1.0f);
 })";
 
-char const * texture_fs_src = R"(
+char const * texture_render_frag = R"(
 #version 320 es
 precision mediump float;
 uniform sampler2D s;
@@ -54,8 +54,31 @@ void main() {
 	frag_color = texture(s, st);
 })";
 
+// Shader program to sample from texture.
+char const * sample_frag = R"(
+#version 320 es
+precision highp float;
+
+// Input texture from previous pass
+uniform sampler2D u_input_texture;
+uniform vec2 u_texel_size;  //!< Input texture texel size in pixels (=1/width, 1/height).
+
+// Output
+layout(location = 0) out vec4 out_result_pixel;
+
+void main() {
+	ivec2 result_pixel_coord = ivec2(gl_FragCoord.xy);  // Get integer coordinates of the output pixel.
+
+	vec2 sample_coord = result_pixel_cord * u_texel_size;
+	out_result_pixel = texture(u_input_texture, sample_coord);  // sample input texture
+}
+)";
+
+
 tuple<GLuint, GLuint, GLuint> create_ndc_quad();
 void draw_quad(GLuint vao);
+
+tuple<GLuint, GLuint> create_fbo(GLuint width, GLuint height);
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	// process arguments
@@ -81,34 +104,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLuint color_texture;  // shared texture
 
 	{ // render into framebuffer
-		// create framebuffer object (FBO) and bind
-		GLuint fbo;
-		glGenFramebuffers(1, &fbo);
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-		// create color buffer texture
-		glGenTextures(1, &color_texture);
-		glBindTexture(GL_TEXTURE_2D, color_texture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, FBO_WIDTH, FBO_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		// attach color and depth textures to the FBO
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color_texture, 0);
-
-		// tell OpenGL that we want to draw into the framebuffer's color attachement
-		GLenum draw_buffers[] = {GL_COLOR_ATTACHMENT0};
-		glDrawBuffers(1, draw_buffers);
-
-		GLenum const fbo_status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
-		assert(fbo_status == GL_FRAMEBUFFER_COMPLETE);
-
 		// render triangle info FBO
 
-		GLuint const object_shader_program = get_shader_program(object_vs_src, object_fs_src);
+		GLuint const object_shader_program = get_shader_program(passthrough_vert, fill_frag);
 		assert(object_shader_program != 0);
+
+		auto [fbo, tex] = create_fbo(FBO_WIDTH, FBO_HEIGHT);
+		color_texture = tex;
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glViewport(0, 0, FBO_WIDTH/2, FBO_HEIGHT/2);  // render only into part of the FBO texture
@@ -126,7 +129,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		// switch to window framebuffer and render texture
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);  // return to the default FB
 
-		GLuint const texture_shader_program = get_shader_program(texture_vs_src, texture_fs_src);
+		GLuint const texture_shader_program = get_shader_program(texture_render_vert, texture_render_frag);
 		assert(texture_shader_program != 0);
 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -211,4 +214,35 @@ void draw_quad(GLuint vao) {
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	assert(glGetError() == GL_NO_ERROR && "opengl error");
 	glBindVertexArray(0);
+}
+
+tuple<GLuint, GLuint> create_fbo(GLuint width, GLuint height) {
+	// create framebuffer object (FBO) and bind
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	// create color buffer texture
+	GLuint color_texture;
+	glGenTextures(1, &color_texture);
+	glBindTexture(GL_TEXTURE_2D, color_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	// attach color and depth textures to the FBO
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color_texture, 0);
+
+	// tell OpenGL that we want to draw into the framebuffer's color attachement
+	GLenum draw_buffers[] = {GL_COLOR_ATTACHMENT0};
+	glDrawBuffers(1, draw_buffers);
+
+	[[maybe_unused]] GLenum const fbo_status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+	assert(fbo_status == GL_FRAMEBUFFER_COMPLETE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);  // unbind frambuffer
+
+	return {fbo, color_texture};
 }

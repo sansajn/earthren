@@ -96,6 +96,7 @@ def build():
 
 	# FBO render sample
 	env.Program(['fbo_render.cpp', triangle_deps])
+	env.Program(['fbo_render_part.cpp', triangle_deps])
 	env.Program(['reduce_shader.cpp', triangle_deps])
 
 	# continue with terrain samples ...
