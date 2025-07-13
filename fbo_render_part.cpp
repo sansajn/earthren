@@ -125,46 +125,48 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glDeleteFramebuffers(1, &fbo);
 	}  // render into framebuffer
 
-	{  // render texture
+
+	// render texture
+	GLuint const texture_shader_program = get_shader_program(texture_render_vert, texture_render_frag);
+	assert(texture_shader_program != 0);
+
+	{
 		// switch to window framebuffer and render texture
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);  // return to the default FB
-
-		GLuint const texture_shader_program = get_shader_program(texture_render_vert, texture_render_frag);
-		assert(texture_shader_program != 0);
 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glViewport(0, 0, WIDTH, HEIGHT);
 
-		// bind color_texture
-		// render texture
 		glUseProgram(texture_shader_program);
 
+		// bind color_texture
 		GLint s_loc = glGetUniformLocation(texture_shader_program, "s");
 		assert(s_loc != -1 && "unknown uniform");
 		glUniform1i(s_loc, 0);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, color_texture);  // bind a texture to active texture unit (0)
+	}  // render texture
 
+	while (true) {  // render loop
+		SDL_Event event;
+		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
+			break;
+
+		// render texure
+		// we want to draw in a loop to prevent flickering due to double buffering
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		draw_quad(ndc_vao);
 
-		glDeleteProgram(texture_shader_program);
-	}  // render texture
+		SDL_GL_SwapWindow(window);
+	}
 
+	glDeleteProgram(texture_shader_program);
 
 	// cleanup
 	glDeleteTextures(1, &color_texture);
 	glDeleteBuffers(1, &ndc_vbo);
 	glDeleteBuffers(1, &ndc_ibo);
 	glDeleteVertexArrays(1, &ndc_vao);
-
-	while (true) {
-		SDL_Event event;
-		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
-			break;
-
-		SDL_GL_SwapWindow(window);
-	}
 
 	SDL_GL_DeleteContext(context);
 	SDL_DestroyWindow(window);
