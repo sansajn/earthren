@@ -101,7 +101,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 	auto [ndc_vao, ndc_vbo, ndc_ibo] = create_ndc_quad();
 
-	GLuint color_texture;  // shared texture
+	GLuint fill_texture,
+		sample_texture;  // shared textures
 
 	{ // render into framebuffer
 		// render geometry into part of FBO
@@ -110,7 +111,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		assert(object_shader_program != 0);
 
 		auto [fbo, tex] = create_fbo(FBO_WIDTH, FBO_HEIGHT);
-		color_texture = tex;
+		fill_texture = tex;
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
 		glClearColor(252.0f/255.0f, 15.0f/255.0f, 192.0f/255.0f, 1.0f);  // pink color
@@ -137,6 +138,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		GLuint const output_width = FBO_WIDTH/2,
 			output_height = FBO_HEIGHT/2;
 		auto [fbo, tex] = create_fbo(output_width, output_height);
+		sample_texture = tex;
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // black color
@@ -149,7 +151,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 
 		// bind input texture
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, color_texture);
+		glBindTexture(GL_TEXTURE_2D, fill_texture);
 		glUniform1i(glGetUniformLocation(sample_shader_program, "u_input_texture"), 0);  // 0 is texture-unit index, in our case 0 (GL_TEXTURE0 from glActivateTexture call)
 
 		{
@@ -162,9 +164,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		// and set textel size uniform
 
 		draw_quad(ndc_vao);
-
-		glDeleteTextures(1, &color_texture);
-		color_texture = tex;
 
 		glDeleteProgram(sample_shader_program);
 		glDeleteFramebuffers(1, &fbo);
@@ -188,7 +187,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		assert(s_loc != -1 && "unknown uniform");
 		glUniform1i(s_loc, 0);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, color_texture);  // bind a texture to active texture unit (0)
 	}  // render texture
 
 	while (true) {  // render loop
@@ -199,7 +197,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		// render texure
 		// we want to draw in a loop to prevent flickering due to double buffering
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+		glViewport(0, 0, WIDTH/2, HEIGHT/2);
+		glBindTexture(GL_TEXTURE_2D, fill_texture);  // bind a texture to active texture unit (0)
 		draw_quad(ndc_vao);
+
+		glViewport(WIDTH/2, 0, WIDTH, HEIGHT/2);
+		glBindTexture(GL_TEXTURE_2D, sample_texture);  // bind a texture to active texture unit (0)
+		draw_quad(ndc_vao);
+
+		// glViewport(0, 0, WIDTH, HEIGHT);
+		// glBindTexture(GL_TEXTURE_2D, sample_texture);  // bind a texture to active texture unit (0)
+		// draw_quad(ndc_vao);
 
 		SDL_GL_SwapWindow(window);
 	}
@@ -207,7 +216,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	glDeleteProgram(texture_shader_program);
 
 	// cleanup
-	glDeleteTextures(1, &color_texture);
+	glDeleteTextures(1, &fill_texture);
+	glDeleteTextures(1, &sample_texture);
 	glDeleteBuffers(1, &ndc_vbo);
 	glDeleteBuffers(1, &ndc_ibo);
 	glDeleteVertexArrays(1, &ndc_vao);
