@@ -69,7 +69,7 @@ layout(location = 0) out vec4 out_result_pixel;
 void main() {
 	ivec2 result_pixel_coord = ivec2(gl_FragCoord.xy);  // Get integer coordinates of the output pixel.
 
-	vec2 sample_coord = result_pixel_cord * u_texel_size;
+	vec2 sample_coord = vec2(result_pixel_coord) * u_texel_size;  // transform uv info input texture space
 	out_result_pixel = texture(u_input_texture, sample_coord);  // sample input texture
 }
 )";
@@ -104,7 +104,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 	GLuint color_texture;  // shared texture
 
 	{ // render into framebuffer
-		// render triangle info FBO
+		// render geometry into part of FBO
 
 		GLuint const object_shader_program = get_shader_program(passthrough_vert, fill_frag);
 		assert(object_shader_program != 0);
@@ -113,18 +113,62 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		color_texture = tex;
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClearColor(252.0f/255.0f, 15.0f/255.0f, 192.0f/255.0f, 1.0f);  // pink color
+		glClear(GL_COLOR_BUFFER_BIT);
+
 		glViewport(0, 0, FBO_WIDTH/2, FBO_HEIGHT/2);  // render only into part of the FBO texture
 
 		glUseProgram(object_shader_program);
 
-		glClear(GL_COLOR_BUFFER_BIT);
 		draw_quad(ndc_vao);
 
 		glDeleteProgram(object_shader_program);
 		glDeleteFramebuffers(1, &fbo);
 	}  // render into framebuffer
 
+
+	// copy/render part of color_texture into another texture
+	{
+		// sample color_texture from previous FBO into new one
+
+		GLuint const sample_shader_program = get_shader_program(passthrough_vert, sample_frag);
+		assert(sample_shader_program != 0);
+
+		GLuint const output_width = FBO_WIDTH/2,
+			output_height = FBO_HEIGHT/2;
+		auto [fbo, tex] = create_fbo(output_width, output_height);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // black color
+		glClear(GL_COLOR_BUFFER_BIT);
+
+
+		glViewport(0, 0, output_width, output_height);  // render half of the input texture into whole output texture
+
+		glUseProgram(sample_shader_program);
+
+		// bind input texture
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, color_texture);
+		glUniform1i(glGetUniformLocation(sample_shader_program, "u_input_texture"), 0);  // 0 is texture-unit index, in our case 0 (GL_TEXTURE0 from glActivateTexture call)
+
+		{
+			float const w_texel_size = 1.0f / static_cast<float>(FBO_WIDTH),
+				h_texel_size = 1.0f / static_cast<float>(FBO_HEIGHT);
+			glUniform2f(glGetUniformLocation(sample_shader_program, "u_texel_size"),
+				w_texel_size, h_texel_size);
+		}
+
+		// and set textel size uniform
+
+		draw_quad(ndc_vao);
+
+		glDeleteTextures(1, &color_texture);
+		color_texture = tex;
+
+		glDeleteProgram(sample_shader_program);
+		glDeleteFramebuffers(1, &fbo);
+	}
 
 	// render texture
 	GLuint const texture_shader_program = get_shader_program(texture_render_vert, texture_render_frag);
