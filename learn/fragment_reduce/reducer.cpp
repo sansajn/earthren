@@ -95,6 +95,8 @@ vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height);
 
 
 tuple<GLuint, GLuint> create_fbo(GLuint width, GLuint height);
+void reduce_half(GLuint input_texture, GLuint width, GLuint height, GLuint output_fbo, GLuint reduce_shader_program, GLuint ndcquad_vao);
+
 
 int main(int argc, char * argv[]) {
 	// process arguments
@@ -336,7 +338,7 @@ int main(int argc, char * argv[]) {
 		// TODO: dan we use do-while loop here?
 		// First pass: input texture -> texture A
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo_a);
-		glViewport(0, 0, input_width/2, input_height/2);
+		glViewport(0, 0, input_width/2, input_height/2);  // in fragment shader this ensure output texture uv
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, inputTexture);
@@ -351,13 +353,14 @@ int main(int argc, char * argv[]) {
 
 		draw_quad(ndcquad_vao);  // render to FBO texture
 
-		{  // save for debugging
+		{  // save result for debugging
 			GLuint const w = input_width/2, 
 				h = input_height/2;
 			vector<float> const pixels = read_back_rgba32f(texture_a, w, h);
 			save_image_rgba(pixels, w, h, "reduction_1.png");
 		}
 
+		// decrease input texture size for next pass
 		input_width /= 2;
 		input_height /= 2;
 
@@ -371,23 +374,7 @@ int main(int argc, char * argv[]) {
 			GLuint const output_width = max(1u, input_width/2),
 				output_height = max(1u, input_height/2);
 			
-			// Bind output FBO
-			glBindFramebuffer(GL_FRAMEBUFFER, current_fbo);
-			glViewport(0, 0, output_width, output_height);
-
-			// Set input texture and uniforms
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, current_input_texture);
-			glUniform1i(glGetUniformLocation(reduce_shader_program, "u_input_texture"), 0);  // 0 is texture-unit index, in our case 0 (GL_TEXTURE0 from glActivateTexture call)
-
-			{
-				float const w_texel_size = 1.0f / static_cast<float>(input_width),
-					h_texel_size = 1.0f / static_cast<float>(input_height);
-				glUniform2f(glGetUniformLocation(reduce_shader_program, "u_texel_size"), 
-					w_texel_size, h_texel_size);
-			}
-
-			draw_quad(ndcquad_vao);  // render to FBO texture
+			reduce_half(current_input_texture, input_width, input_height, current_fbo, reduce_shader_program, ndcquad_vao);
 
 			{
 				// save for debugging
@@ -571,6 +558,30 @@ GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height,
 	glDeleteFramebuffers(1, &fbo);
 
 	return reduced_texture;
+}
+
+// Reduce input texture into texture FBO.
+void reduce_half(GLuint input_texture, GLuint width, GLuint height, GLuint output_fbo, GLuint reduce_shader_program, GLuint ndcquad_vao) {
+	GLuint const output_width = max(1u, width/2),
+		output_height = max(1u, height/2);
+
+	// Bind output FBO
+	glBindFramebuffer(GL_FRAMEBUFFER, output_fbo);
+	glViewport(0, 0, output_width, output_height);
+
+	// Set input texture and uniforms
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, input_texture);
+	glUniform1i(glGetUniformLocation(reduce_shader_program, "u_input_texture"), 0);  // 0 is texture-unit index, in our case 0 (GL_TEXTURE0 from glActivateTexture call)
+
+	{
+		float const w_texel_size = 1.0f / static_cast<float>(width),
+			h_texel_size = 1.0f / static_cast<float>(height);
+		glUniform2f(glGetUniformLocation(reduce_shader_program, "u_texel_size"), 
+			w_texel_size, h_texel_size);
+	}
+
+	draw_quad(ndcquad_vao);  // render to FBO texture
 }
 
 /*! Switch to the window framebuffer and render texture. 
