@@ -68,16 +68,7 @@ TextureData create_data_texture(int width, int height);
 
 TextureData load_from_image(string const & file_name);
 
-// TODO: we can remove
-vector<float> read_back(GLuint fbo, int width, int height) {
-	assert(width >= 1 && height >= 1 && "Width and height must be at least 1");
-	
-	vector<float> pixels(width * height * 4);  // RGBA format
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, pixels.data());
-
-	return pixels;
-}
+vector<float> read_back_rgba32f(GLuint fbo, int width, int height);
 
 void save_texture_as_png(GLuint textureID, std::string const & filename);
 
@@ -91,7 +82,7 @@ GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height,
 	GLuint reduce_program, GLuint quad_vao);
 
 // Reads back RGBA32F texture data from OpenGL framebuffer for OpenGL ES 3.2.
-vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height);
+vector<float> read_back_texture_rgba32f(GLuint texture_id, GLuint width, GLuint height);
 
 
 tuple<GLuint, GLuint> create_fbo(GLuint width, GLuint height);
@@ -325,38 +316,17 @@ int main(int argc, char * argv[]) {
 		auto [fbo_a, texture_a] = create_fbo(initialWidth/2, initialHeight/2);
 		auto [fbo_b, texture_b] = create_fbo(initialWidth/4, initialHeight/4);
 
-		// TODO: maybe we do not need reset right now
-		// Reset bindings
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glBindTexture(GL_TEXTURE_2D, 0);
-
 		glUseProgram(reduce_shader_program);  // see reduction shader
 
 		GLuint input_width = initialWidth, 
 			input_height = initialHeight;
 
-		// TODO: dan we use do-while loop here?
-		// First pass: input texture -> texture A
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo_a);
-		glViewport(0, 0, input_width/2, input_height/2);  // in fragment shader this ensure output texture uv
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, inputTexture);
-		glUniform1i(glGetUniformLocation(reduce_shader_program, "u_input_texture"), 0);
-
-		{
-			float const w_texel_size = 1.0f / static_cast<float>(input_width),
-				h_texel_size = 1.0f / static_cast<float>(input_height);
-			glUniform2f(glGetUniformLocation(reduce_shader_program, "u_texel_size"), 
-				w_texel_size, h_texel_size);
-		}
-
-		draw_quad(ndcquad_vao);  // render to FBO texture
+		reduce_half(inputTexture, input_width, input_height, fbo_a, reduce_shader_program, ndcquad_vao);
 
 		{  // save result for debugging
 			GLuint const w = input_width/2, 
 				h = input_height/2;
-			vector<float> const pixels = read_back_rgba32f(texture_a, w, h);
+			vector<float> const pixels = read_back_texture_rgba32f(texture_a, w, h);
 			save_image_rgba(pixels, w, h, "reduction_1.png");
 		}
 
@@ -378,8 +348,9 @@ int main(int argc, char * argv[]) {
 
 			{
 				// save for debugging
-				vector<float> const pixels = read_back_rgba32f(current_output_texture, output_width, output_height);
+				vector<float> const pixels = read_back_rgba32f(current_fbo, output_width, output_height); 
 				save_image_rgba(pixels, output_width, output_height, std::format("reduction_{}.png", reduce_iteration));
+
 			}
 
 			// swap FBOs
@@ -408,7 +379,7 @@ int main(int argc, char * argv[]) {
 		assert(input_width == 1 && input_height == 1 && "Final reduction should be 1x1 pixel");
 
 		// read back result
-		vector<float> const result = read_back(current_fbo, 1, 1);
+		vector<float> const result = read_back_rgba32f(current_fbo, 1, 1);
 		cout << "Reduction result: (" << result[0] << ", " << result[1] << ", "
 			<< result[2] << ", " << result[3] << ")" << endl;
 
@@ -488,8 +459,21 @@ int main(int argc, char * argv[]) {
 }
 
 
+
+vector<float> read_back_rgba32f(GLuint fbo, int width, int height) {
+	assert(width >= 1 && height >= 1 && "Width and height must be at least 1");
+	
+	vector<float> pixels(width * height * 4);  // RGBA format
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, pixels.data());
+
+	return pixels;
+}
+
+
+
 // Reads back RGBA32F texture data from OpenGL framebuffer for OpenGL ES 3.2.
-vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height) {
+vector<float> read_back_texture_rgba32f(GLuint texture_id, GLuint width, GLuint height) {
 	GLuint fbo;
 	glGenFramebuffers(1, &fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -502,12 +486,7 @@ vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height) 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		throw std::runtime_error("FBO incomplete");
 
-	// prepare storage
-	vector<float> data(width*height*4);
-	// read back floats
-	glReadPixels(0, 0, width, height,
-					GL_RGBA, GL_FLOAT,
-					data.data());
+	vector<float> data = read_back_rgba32f(fbo, width, height);
 
 	// cleanup
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -876,6 +855,7 @@ tuple<GLuint, GLuint> create_fbo(GLuint width, GLuint height) {
 	[[maybe_unused]] GLenum const fbo_status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
 	assert(fbo_status == GL_FRAMEBUFFER_COMPLETE);
 
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);  // unbind frambuffer
 
 	return {fbo, color_texture};
