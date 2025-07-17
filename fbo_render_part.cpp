@@ -14,7 +14,7 @@ using std::string, std::tuple;
 using namespace std::string_literals;
 
 constexpr GLuint WIDTH = 800,
-	HEIGHT = 600,
+	HEIGHT = 300,
 	FBO_WIDTH = 512,
 	FBO_HEIGHT = 512;
 
@@ -144,7 +144,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // black color
 		glClear(GL_COLOR_BUFFER_BIT);
 
-
 		glViewport(0, 0, output_width, output_height);  // render half of the input texture into whole output texture
 
 		glUseProgram(sample_shader_program);
@@ -169,7 +168,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		glDeleteFramebuffers(1, &fbo);
 	}
 
-	// render texture
+	// render texture fill and sample textures
 	GLuint const texture_shader_program = get_shader_program(texture_render_vert, texture_render_frag);
 	assert(texture_shader_program != 0);
 
@@ -198,11 +197,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char * argv[]) {
 		// we want to draw in a loop to prevent flickering due to double buffering
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-		glViewport(0, 0, WIDTH/2, HEIGHT/2);
+		glViewport(0, 0, WIDTH/2, HEIGHT);
 		glBindTexture(GL_TEXTURE_2D, fill_texture);  // bind a texture to active texture unit (0)
 		draw_quad(ndc_vao);
 
-		glViewport(WIDTH/2, 0, WIDTH, HEIGHT/2);
+		glViewport(WIDTH/2, 0, WIDTH, HEIGHT);
 		glBindTexture(GL_TEXTURE_2D, sample_texture);  // bind a texture to active texture unit (0)
 		draw_quad(ndc_vao);
 

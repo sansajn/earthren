@@ -93,6 +93,9 @@ GLuint reduce_texture_half(GLuint texture_id, GLuint width, GLuint height,
 // Reads back RGBA32F texture data from OpenGL framebuffer for OpenGL ES 3.2.
 vector<float> read_back_rgba32f(GLuint texture_id, GLuint width, GLuint height);
 
+
+tuple<GLuint, GLuint> create_fbo(GLuint width, GLuint height);
+
 int main(int argc, char * argv[]) {
 	// process arguments
 	Magick::InitializeMagick(*argv);
@@ -317,39 +320,8 @@ int main(int argc, char * argv[]) {
 		// Setup enviornment for resude (FBOs and textures)
 
 		// Ping-pong FBOs and textures for reduction passes
-		GLuint fbo_a, fbo_b;
-		GLuint texture_a, texture_b;
-
-		// Create FBOs
-		glGenFramebuffers(1, &fbo_a);
-		glGenFramebuffers(1, &fbo_b);
-
-		// Create textures
-		glGenTextures(1, &texture_a);
-		glGenTextures(1, &texture_b);
-
-		// Setup texture A (half size of input texture)
-		glBindTexture(GL_TEXTURE_2D, texture_a);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, initialWidth/2, initialHeight/2, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		// Setup texture B (half size of texture A)
-		glBindTexture(GL_TEXTURE_2D, texture_b);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, initialWidth/4, initialHeight/4, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		// Attach textures to FBOs
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo_a);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_a, 0);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo_b);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_b, 0);
+		auto [fbo_a, texture_a] = create_fbo(initialWidth/2, initialHeight/2);
+		auto [fbo_b, texture_b] = create_fbo(initialWidth/4, initialHeight/4);
 
 		// TODO: maybe we do not need reset right now
 		// Reset bindings
@@ -864,4 +836,36 @@ TextureData load_from_image(string const & file_name) {
 	result.height = h;
 
 	return result;
+}
+
+
+tuple<GLuint, GLuint> create_fbo(GLuint width, GLuint height) {
+	// create framebuffer object (FBO) and bind
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	// create color buffer texture
+	GLuint color_texture;
+	glGenTextures(1, &color_texture);
+	glBindTexture(GL_TEXTURE_2D, color_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	// attach color and depth textures to the FBO
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color_texture, 0);
+
+	// tell OpenGL that we want to draw into the framebuffer's color attachement
+	GLenum draw_buffers[] = {GL_COLOR_ATTACHMENT0};
+	glDrawBuffers(1, draw_buffers);
+
+	[[maybe_unused]] GLenum const fbo_status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+	assert(fbo_status == GL_FRAMEBUFFER_COMPLETE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);  // unbind frambuffer
+
+	return {fbo, color_texture};
 }
